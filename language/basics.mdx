@@ -1,0 +1,260 @@
+---
+title: Lua Basics
+description: Learn the fundamentals of Lua programming language syntax and structure
+---
+
+## Introduction
+
+Lua is a powerful, efficient, lightweight scripting language. It supports procedural, object-oriented, functional, and data-driven programming.
+
+## Hello World
+
+```lua
+print("Hello, World!")
+```
+
+## Comments
+
+Lua supports both single-line and multi-line comments:
+
+<CodeGroup>
+```lua Single-line Comments
+-- This is a single-line comment
+local x = 10  -- Comments can appear after code
+```
+
+```lua Multi-line Comments
+--[[
+  This is a multi-line comment
+  It can span multiple lines
+]]
+
+--[=[
+  Multi-line comments with level markers
+  can contain [[ and ]] inside them
+]=]
+```
+</CodeGroup>
+
+## Variables
+
+### Local vs Global Variables
+
+<Note>
+Always prefer `local` variables for better performance and to avoid polluting the global namespace.
+</Note>
+
+```lua
+-- Global variable
+x = 10
+
+-- Local variable
+local y = 20
+
+-- Multiple assignments
+local a, b, c = 1, 2, 3
+
+-- Swapping values
+a, b = b, a
+```
+
+### Variable Scope
+
+```lua
+local x = 10
+
+do
+  local x = 20  -- This is a different variable
+  print(x)      -- prints 20
+end
+
+print(x)        -- prints 10
+```
+
+## Constant Variables
+
+Lua 5.4+ supports constant variables using the `<const>` attribute:
+
+```lua
+local pi <const> = 3.14159
+-- pi = 3.14  -- Error: attempt to assign to const variable 'pi'
+
+local function foo()
+  local x <const> = 10
+  return x
+end
+```
+
+<Warning>
+Attempting to assign to a const variable will result in a runtime error.
+</Warning>
+
+## Semicolons
+
+Semicolons are optional in Lua but can be used to separate statements:
+
+```lua
+-- These are all valid
+local a = 1; local b = 2; local c = 3
+
+local x = 10
+local y = 20
+
+;;;  -- Multiple semicolons are also valid
+do ;;; end
+```
+
+## Operators
+
+### Arithmetic Operators
+
+```lua
+local a, b = 10, 3
+
+local sum = a + b        -- Addition: 13
+local diff = a - b       -- Subtraction: 7
+local product = a * b    -- Multiplication: 30
+local quotient = a / b   -- Division: 3.333...
+local floor_div = a // b -- Floor division: 3
+local remainder = a % b  -- Modulo: 1
+local power = a ^ b      -- Exponentiation: 1000
+local negation = -a      -- Unary minus: -10
+```
+
+### Comparison Operators
+
+```lua
+local a, b = 10, 20
+
+local equal = (a == b)        -- false
+local not_equal = (a ~= b)    -- true
+local less = (a < b)          -- true
+local greater = (a > b)       -- false
+local less_eq = (a <= b)      -- true
+local greater_eq = (a >= b)   -- false
+```
+
+### Logical Operators
+
+```lua
+-- and, or, not
+local result1 = true and false   -- false
+local result2 = true or false    -- true
+local result3 = not true         -- false
+
+-- Short-circuit evaluation
+local x = nil
+local y = x or 10    -- y = 10 (x is falsy)
+local z = 5 and 10   -- z = 10 (5 is truthy)
+```
+
+### Bitwise Operators (Lua 5.3+)
+
+```lua
+local a, b = 0xF0, 0xCC
+
+local band = a & b     -- Bitwise AND
+local bor = a | b      -- Bitwise OR
+local bxor = a ~ b     -- Bitwise XOR
+local bnot = ~a        -- Bitwise NOT
+local lshift = a << 2  -- Left shift
+local rshift = a >> 2  -- Right shift
+
+assert(0xF0 | 0xCC ~ 0xAA & 0xFD == 0xF4)
+```
+
+## Operator Precedence
+
+Lua operators follow this precedence (highest to lowest):
+
+```lua
+-- Highest precedence
+assert(2^3^2 == 2^(3^2))  -- Exponentiation is right-associative
+assert(2^3*4 == (2^3)*4)
+assert(-2^2 == -4 and (-2)^2 == 4)
+
+-- Logical operators
+assert(not nil and 2 and not(2>3 or 3<2))
+assert(2*1+3/3 == 3 and 1+2 .. 3*1 == "33")
+```
+
+## Type Checking
+
+Use the `type()` function to check variable types:
+
+```lua
+assert(type(1<2) == 'boolean')
+assert(type(true) == 'boolean' and type(false) == 'boolean')
+assert(type(nil) == 'nil')
+assert(type(-3) == 'number')
+assert(type'x' == 'string')
+assert(type{} == 'table')
+assert(type(print) == 'function')
+```
+
+## Loading and Executing Code
+
+### Using load()
+
+```lua
+-- Load string as Lua code
+local chunk = load("return 10 + 20")
+local result = chunk()  -- 30
+
+-- Load with environment
+local env = {x = 5}
+local chunk = load("return x * 2", "chunk", "t", env)
+assert(chunk() == 10)
+```
+
+### Error Handling
+
+<Tabs>
+<Tab title="pcall">
+```lua
+local success, result = pcall(function()
+  return 10 / 2
+end)
+
+if success then
+  print("Result:", result)  -- Result: 5
+else
+  print("Error:", result)
+end
+```
+</Tab>
+
+<Tab title="xpcall">
+```lua
+local function errorHandler(err)
+  return "Error occurred: " .. tostring(err)
+end
+
+local success, result = xpcall(function()
+  error("Something went wrong")
+end, errorHandler)
+
+print(result)  -- Error occurred: Something went wrong
+```
+</Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Data Types" icon="database" href="./data-types">
+Learn about Lua's eight basic data types
+</Card>
+
+<Card title="Control Flow" icon="code-branch" href="./control-flow">
+Master conditional statements and loops
+</Card>
+
+<Card title="Functions" icon="function" href="./functions">
+Understand function definitions and calls
+</Card>
+
+<Card title="Tables" icon="table" href="./tables">
+Explore Lua's powerful table data structure
+</Card>
+</CardGroup>

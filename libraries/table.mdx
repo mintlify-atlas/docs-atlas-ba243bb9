@@ -1,0 +1,330 @@
+---
+title: "Table Library"
+description: "Functions for table manipulation and array operations"
+---
+
+The table library provides functions to manipulate tables, particularly as arrays. All functions ignore non-numeric keys in tables used as arrays.
+
+## Array Operations
+
+<CardGroup cols={2}>
+  <Card title="Modification">
+    Functions: `insert`, `remove`, `move`
+  </Card>
+  <Card title="Organization">
+    Functions: `sort`, `concat`
+  </Card>
+  <Card title="Packing">
+    Functions: `pack`, `unpack`
+  </Card>
+  <Card title="Creation">
+    Functions: `create`
+  </Card>
+</CardGroup>
+
+## Table Creation
+
+### table.create
+
+Creates a table with pre-allocated space.
+
+<ParamField path="nseq" type="integer" required>
+  Number of array elements to pre-allocate
+</ParamField>
+
+<ParamField path="nrec" type="integer">
+  Number of non-array elements to pre-allocate (default: 0)
+</ParamField>
+
+<ResponseField name="table" type="table">
+  New empty table
+</ResponseField>
+
+```lua
+local t = table.create(100)      -- Pre-allocate for 100 array elements
+local t = table.create(10, 20)   -- 10 array + 20 hash elements
+```
+
+## Insertion and Removal
+
+### table.insert
+
+Inserts an element into an array.
+
+<ParamField path="list" type="table" required>
+  Array to modify
+</ParamField>
+
+<ParamField path="pos" type="integer">
+  Position to insert at (default: end of array)
+</ParamField>
+
+<ParamField path="value" type="any" required>
+  Value to insert
+</ParamField>
+
+```lua
+local t = {10, 20, 30}
+table.insert(t, 40)      -- {10, 20, 30, 40}
+table.insert(t, 2, 15)   -- {10, 15, 20, 30, 40}
+```
+
+### table.remove
+
+Removes an element from an array.
+
+<ParamField path="list" type="table" required>
+  Array to modify
+</ParamField>
+
+<ParamField path="pos" type="integer">
+  Position to remove from (default: end of array)
+</ParamField>
+
+<ResponseField name="value" type="any">
+  Removed value
+</ResponseField>
+
+```lua
+local t = {10, 20, 30, 40}
+local v = table.remove(t)     -- v = 40, t = {10, 20, 30}
+local v = table.remove(t, 2)  -- v = 20, t = {10, 30}
+```
+
+### table.move
+
+Moves elements between positions in arrays.
+
+<ParamField path="a1" type="table" required>
+  Source table
+</ParamField>
+
+<ParamField path="f" type="integer" required>
+  Start index of range to move
+</ParamField>
+
+<ParamField path="e" type="integer" required>
+  End index of range to move
+</ParamField>
+
+<ParamField path="t" type="integer" required>
+  Destination start index
+</ParamField>
+
+<ParamField path="a2" type="table">
+  Destination table (default: a1)
+</ParamField>
+
+<ResponseField name="table" type="table">
+  The destination table
+</ResponseField>
+
+```lua
+local t = {1, 2, 3, 4, 5}
+table.move(t, 1, 3, 4)  -- {1, 2, 3, 1, 2, 3}
+
+-- Copy to another table
+local t1 = {1, 2, 3}
+local t2 = {}
+table.move(t1, 1, 3, 1, t2)  -- t2 = {1, 2, 3}
+```
+
+## Array Organization
+
+### table.sort
+
+Sorts array elements in-place.
+
+<ParamField path="list" type="table" required>
+  Array to sort
+</ParamField>
+
+<ParamField path="comp" type="function">
+  Comparison function (default: less-than operator)
+</ParamField>
+
+```lua
+local t = {3, 1, 4, 1, 5, 9, 2, 6}
+table.sort(t)  -- {1, 1, 2, 3, 4, 5, 6, 9}
+
+-- Custom comparison
+local t = {"apple", "Banana", "cherry"}
+table.sort(t, function(a, b)
+  return a:lower() < b:lower()
+end)
+-- {"apple", "Banana", "cherry"}
+
+-- Sort objects by field
+local people = {
+  {name="Bob", age=30},
+  {name="Alice", age=25},
+  {name="Charlie", age=35}
+}
+table.sort(people, function(a, b)
+  return a.age < b.age
+end)
+```
+
+### table.concat
+
+Concatenates array elements into a string.
+
+<ParamField path="list" type="table" required>
+  Array of strings/numbers
+</ParamField>
+
+<ParamField path="sep" type="string">
+  Separator string (default: "")
+</ParamField>
+
+<ParamField path="i" type="integer">
+  Start index (default: 1)
+</ParamField>
+
+<ParamField path="j" type="integer">
+  End index (default: #list)
+</ParamField>
+
+<ResponseField name="result" type="string">
+  Concatenated string
+</ResponseField>
+
+```lua
+local t = {"hello", "world", "lua"}
+table.concat(t)           -- "helloworldlua"
+table.concat(t, " ")      -- "hello world lua"
+table.concat(t, ", ")     -- "hello, world, lua"
+table.concat(t, "-", 2, 3)  -- "world-lua"
+```
+
+## Packing and Unpacking
+
+### table.pack
+
+Packs values into a table with field `n`.
+
+<ParamField path="···" type="any">
+  Values to pack
+</ParamField>
+
+<ResponseField name="table" type="table">
+  Table with values and field `n` = number of values
+</ResponseField>
+
+```lua
+local t = table.pack(1, 2, 3, 4)
+-- t = {1, 2, 3, 4, n = 4}
+
+local t = table.pack("a", nil, "b")
+-- t = {"a", nil, "b", n = 3}
+print(t.n)  -- 3
+```
+
+### table.unpack
+
+Unpacks array elements as separate values.
+
+<ParamField path="list" type="table" required>
+  Array to unpack
+</ParamField>
+
+<ParamField path="i" type="integer">
+  Start index (default: 1)
+</ParamField>
+
+<ParamField path="j" type="integer">
+  End index (default: #list)
+</ParamField>
+
+<ResponseField name="···" type="any">
+  Unpacked values
+</ResponseField>
+
+```lua
+local t = {10, 20, 30}
+print(table.unpack(t))       -- 10    20    30
+
+local a, b = table.unpack(t)  -- a = 10, b = 20
+
+-- Unpack range
+print(table.unpack(t, 2, 3))  -- 20    30
+
+-- Passing array to function
+local function sum(a, b, c)
+  return a + b + c
+end
+print(sum(table.unpack({1, 2, 3})))  -- 6
+```
+
+## Usage Examples
+
+### Building a List
+
+```lua
+local list = {}
+for i = 1, 10 do
+  table.insert(list, i * i)
+end
+-- list = {1, 4, 9, 16, 25, 36, 49, 64, 81, 100}
+```
+
+### Stack Implementation
+
+```lua
+local stack = {}
+
+function push(stack, value)
+  table.insert(stack, value)
+end
+
+function pop(stack)
+  return table.remove(stack)
+end
+
+push(stack, "first")
+push(stack, "second")
+print(pop(stack))  -- "second"
+print(pop(stack))  -- "first"
+```
+
+### Queue Implementation
+
+```lua
+local queue = {}
+
+function enqueue(queue, value)
+  table.insert(queue, value)
+end
+
+function dequeue(queue)
+  return table.remove(queue, 1)
+end
+
+enqueue(queue, "first")
+enqueue(queue, "second")
+print(dequeue(queue))  -- "first"
+print(dequeue(queue))  -- "second"
+```
+
+### Copying Arrays
+
+```lua
+local original = {1, 2, 3, 4, 5}
+local copy = {}
+table.move(original, 1, #original, 1, copy)
+-- copy = {1, 2, 3, 4, 5}
+```
+
+### Filtering Arrays
+
+```lua
+local numbers = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+local evens = {}
+
+for _, v in ipairs(numbers) do
+  if v % 2 == 0 then
+    table.insert(evens, v)
+  end
+end
+-- evens = {2, 4, 6, 8, 10}
+```

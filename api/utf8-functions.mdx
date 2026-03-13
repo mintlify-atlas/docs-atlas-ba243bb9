@@ -1,0 +1,386 @@
+---
+title: 'UTF-8 Functions'
+description: 'UTF-8 string encoding and manipulation functions'
+---
+
+The utf8 library provides functions for UTF-8 string manipulation. UTF-8 is a variable-width character encoding that can represent any Unicode character.
+
+## Character Operations
+
+<Accordion title="utf8.char">
+Converts Unicode code points to a UTF-8 string.
+
+```lua
+utf8.char(...)
+```
+
+**Parameters:** One or more Unicode code points
+
+**Returns:** UTF-8 string
+
+**Example:**
+```lua
+print(utf8.char(65))              -- "A"
+print(utf8.char(72, 101, 108, 108, 111))  -- "Hello"
+print(utf8.char(0x1F600))         -- "😀" (emoji)
+print(utf8.char(0x03B1, 0x03B2))  -- "αβ" (Greek letters)
+
+-- Build a string
+local chars = {}
+for i = 65, 90 do  -- A-Z
+  table.insert(chars, utf8.char(i))
+end
+local alphabet = table.concat(chars)
+print(alphabet)  -- "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+```
+</Accordion>
+
+<Accordion title="utf8.codepoint">
+Returns the code points of characters in a string.
+
+```lua
+utf8.codepoint(s [, i [, j [, lax]]])
+```
+
+**Parameters:**
+- `s` - String
+- `i` - Start position (default: 1)
+- `j` - End position (default: i)
+- `lax` - Allow invalid sequences
+
+**Returns:** Code points
+
+**Example:**
+```lua
+print(utf8.codepoint("A"))        -- 65
+print(utf8.codepoint("Hello", 1, 5))  -- 72  101  108  108  111
+
+local s = "😀"  -- Emoji
+print(utf8.codepoint(s))          -- 128512 (0x1F600)
+
+-- Get all code points
+for pos, code in utf8.codes("Hello") do
+  print(pos, code, utf8.char(code))
+end
+-- 1  72  H
+-- 2  101 e
+-- 3  108 l
+-- 4  108 l
+-- 5  111 o
+```
+</Accordion>
+
+## String Length
+
+<Accordion title="utf8.len">
+Returns the number of UTF-8 characters in a string.
+
+```lua
+utf8.len(s [, i [, j [, lax]]])
+```
+
+**Returns:** Number of characters or nil + position of invalid byte
+
+**Example:**
+```lua
+local s = "Hello"
+print(utf8.len(s))           -- 5
+print(#s)                    -- 5 (same for ASCII)
+
+local s = "你好"  -- Chinese "hello"
+print(utf8.len(s))           -- 2 (characters)
+print(#s)                    -- 6 (bytes)
+
+local s = "café"  -- French "cafe"
+print(utf8.len(s))           -- 4 (characters)
+print(#s)                    -- 5 (bytes)
+
+-- Check for invalid UTF-8
+local len, pos = utf8.len("\xFF\xFE")
+if not len then
+  print("Invalid UTF-8 at position", pos)
+end
+
+-- Lax mode (allow invalid sequences)
+local len = utf8.len("\xFF\xFE", 1, -1, true)
+print(len)  -- Returns a number
+```
+</Accordion>
+
+## Character Iteration
+
+<Accordion title="utf8.codes">
+Returns an iterator for character positions and code points.
+
+```lua
+utf8.codes(s [, lax])
+```
+
+**Returns:** Iterator function
+
+**Example:**
+```lua
+local s = "Hello 🌍"  -- "Hello " + Earth emoji
+for pos, code in utf8.codes(s) do
+  print(string.format("pos=%d code=%d char=%s", 
+        pos, code, utf8.char(code)))
+end
+-- pos=1 code=72 char=H
+-- pos=2 code=101 char=e
+-- pos=3 code=108 char=l
+-- pos=4 code=108 char=l
+-- pos=5 code=111 char=o
+-- pos=6 code=32 char= 
+-- pos=7 code=127757 char=🌍
+
+-- Count specific characters
+local count = 0
+for pos, code in utf8.codes("H€o") do
+  if code == 0x20AC then  -- Euro sign
+    count = count + 1
+  end
+end
+print(count)
+```
+</Accordion>
+
+## Byte Offsets
+
+<Accordion title="utf8.offset">
+Returns the byte position of a character.
+
+```lua
+utf8.offset(s, n [, i])
+```
+
+**Parameters:**
+- `s` - String
+- `n` - Character number (0 for current, negative for backward)
+- `i` - Starting byte position (default: 1 or #s+1)
+
+**Returns:** Byte position or nil
+
+**Example:**
+```lua
+local s = "café"  -- 4 characters, 5 bytes
+
+-- Get byte position of each character
+for i = 1, utf8.len(s) do
+  local pos = utf8.offset(s, i)
+  print(string.format("char %d at byte %d", i, pos))
+end
+-- char 1 at byte 1
+-- char 2 at byte 2
+-- char 3 at byte 3
+-- char 4 at byte 4
+
+-- Navigate characters
+local pos = 1
+for i = 1, 3 do
+  pos = utf8.offset(s, 1, pos + 1)  -- Next character
+  print(pos)
+end
+
+-- Go backward
+local pos = #s
+local prevPos = utf8.offset(s, -1, pos)
+print(prevPos)  -- Position of second-to-last character
+```
+</Accordion>
+
+## Pattern
+
+<Accordion title="utf8.charpattern">
+A pattern that matches exactly one UTF-8 character.
+
+```lua
+utf8.charpattern
+```
+
+**Value:** `"[\0-\x7F\xC2-\xFD][\x80-\xBF]*"`
+
+**Example:**
+```lua
+-- Extract characters one by one
+local s = "Hello 🌍"
+for char in string.gmatch(s, utf8.charpattern) do
+  print(char, utf8.codepoint(char))
+end
+
+-- Split into characters
+local chars = {}
+for char in string.gmatch(s, utf8.charpattern) do
+  table.insert(chars, char)
+end
+print(#chars)  -- Number of characters
+
+-- Replace characters
+local s = "hello"
+local result = string.gsub(s, utf8.charpattern, function(char)
+  local code = utf8.codepoint(char)
+  return utf8.char(code + 1)  -- Next character
+end)
+print(result)  -- "ifmmp"
+```
+</Accordion>
+
+## Practical Examples
+
+### Character Count
+
+```lua
+function countChars(str)
+  local count = 0
+  for p, c in utf8.codes(str) do
+    count = count + 1
+  end
+  return count
+end
+
+print(countChars("Hello"))      -- 5
+print(countChars("你好"))        -- 2
+print(countChars("café"))       -- 4
+```
+
+### Substring (by characters)
+
+```lua
+function utf8sub(s, i, j)
+  local startByte = utf8.offset(s, i)
+  local endByte
+  if j then
+    endByte = utf8.offset(s, j + 1)
+    if endByte then
+      endByte = endByte - 1
+    end
+  end
+  return string.sub(s, startByte, endByte)
+end
+
+local s = "Hello World"
+print(utf8sub(s, 1, 5))   -- "Hello"
+print(utf8sub(s, 7))      -- "World"
+
+local s = "你好世界"  -- Chinese "Hello World"
+print(utf8sub(s, 1, 2))   -- "你好"
+```
+
+### Reverse String
+
+```lua
+function utf8reverse(s)
+  local chars = {}
+  for p, c in utf8.codes(s) do
+    table.insert(chars, 1, utf8.char(c))
+  end
+  return table.concat(chars)
+end
+
+print(utf8reverse("Hello"))   -- "olleH"
+print(utf8reverse("你好"))     -- "好你"
+```
+
+### Upper/Lower Case (ASCII only)
+
+```lua
+function utf8upper(s)
+  local result = {}
+  for p, c in utf8.codes(s) do
+    if c >= 97 and c <= 122 then  -- a-z
+      c = c - 32  -- Convert to uppercase
+    end
+    table.insert(result, utf8.char(c))
+  end
+  return table.concat(result)
+end
+
+function utf8lower(s)
+  local result = {}
+  for p, c in utf8.codes(s) do
+    if c >= 65 and c <= 90 then  -- A-Z
+      c = c + 32  -- Convert to lowercase
+    end
+    table.insert(result, utf8.char(c))
+  end
+  return table.concat(result)
+end
+
+print(utf8upper("Hello"))  -- "HELLO"
+print(utf8lower("WORLD"))  -- "world"
+```
+
+### Validate UTF-8
+
+```lua
+function isValidUTF8(s)
+  local len, pos = utf8.len(s)
+  if len then
+    return true
+  else
+    return false, pos
+  end
+end
+
+local valid, pos = isValidUTF8("Hello")
+print(valid)  -- true
+
+valid, pos = isValidUTF8("\xFF\xFE")
+print(valid, pos)  -- false  1
+```
+
+### Truncate to Width
+
+```lua
+function truncate(s, maxChars)
+  local count = 0
+  local result = {}
+  
+  for p, c in utf8.codes(s) do
+    if count >= maxChars then break end
+    table.insert(result, utf8.char(c))
+    count = count + 1
+  end
+  
+  if count < utf8.len(s) then
+    table.insert(result, "...")
+  end
+  
+  return table.concat(result)
+end
+
+local long = "This is a very long string"
+print(truncate(long, 10))  -- "This is a ..."
+```
+
+### Word Wrap (UTF-8 aware)
+
+```lua
+function wordwrap(text, width)
+  local lines = {}
+  local line = ""
+  local lineLen = 0
+  
+  for word in text:gmatch("%S+") do
+    local wordLen = utf8.len(word)
+    if lineLen + wordLen + 1 > width then
+      table.insert(lines, line)
+      line = word
+      lineLen = wordLen
+    else
+      if lineLen > 0 then
+        line = line .. " " .. word
+        lineLen = lineLen + 1 + wordLen
+      else
+        line = word
+        lineLen = wordLen
+      end
+    end
+  end
+  
+  if lineLen > 0 then
+    table.insert(lines, line)
+  end
+  
+  return table.concat(lines, "\n")
+end
+```

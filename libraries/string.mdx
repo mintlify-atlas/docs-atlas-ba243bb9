@@ -1,0 +1,465 @@
+---
+title: "String Library"
+description: "String manipulation and pattern matching functions"
+---
+
+The string library provides functions for string manipulation, including pattern matching, formatting, and case conversion.
+
+## Basic Operations
+
+<CardGroup cols={2}>
+  <Card title="String Information">
+    Functions: `len`, `byte`, `char`
+  </Card>
+  <Card title="Case Conversion">
+    Functions: `upper`, `lower`
+  </Card>
+  <Card title="String Manipulation">
+    Functions: `sub`, `rep`, `reverse`
+  </Card>
+  <Card title="Pattern Matching">
+    Functions: `find`, `match`, `gmatch`, `gsub`
+  </Card>
+</CardGroup>
+
+## String Information
+
+### string.len
+
+Returns the length of a string.
+
+<ParamField path="s" type="string" required>
+  String to measure
+</ParamField>
+
+<ResponseField name="length" type="integer">
+  Number of bytes in the string
+</ResponseField>
+
+```lua
+string.len("hello")  -- 5
+("hello"):len()      -- 5
+```
+
+### string.byte
+
+Returns the numerical codes of characters.
+
+<ParamField path="s" type="string" required>
+  Input string
+</ParamField>
+
+<ParamField path="i" type="integer">
+  Start position (default: 1)
+</ParamField>
+
+<ParamField path="j" type="integer">
+  End position (default: i)
+</ParamField>
+
+<ResponseField name="···" type="integer">
+  Character codes
+</ResponseField>
+
+```lua
+string.byte("ABC")        -- 65
+string.byte("ABC", 1, 3)  -- 65, 66, 67
+```
+
+### string.char
+
+Creates a string from character codes.
+
+<ParamField path="···" type="integer" required>
+  Character codes (0-255)
+</ParamField>
+
+<ResponseField name="s" type="string">
+  Resulting string
+</ResponseField>
+
+```lua
+string.char(65, 66, 67)  -- "ABC"
+```
+
+## Case Conversion
+
+### string.upper
+
+Converts a string to uppercase.
+
+<ParamField path="s" type="string" required>
+  String to convert
+</ParamField>
+
+<ResponseField name="result" type="string">
+  Uppercase string
+</ResponseField>
+
+```lua
+string.upper("Hello")  -- "HELLO"
+("Hello"):upper()      -- "HELLO"
+```
+
+### string.lower
+
+Converts a string to lowercase.
+
+<ParamField path="s" type="string" required>
+  String to convert
+</ParamField>
+
+<ResponseField name="result" type="string">
+  Lowercase string
+</ResponseField>
+
+```lua
+string.lower("Hello")  -- "hello"
+("Hello"):lower()      -- "hello"
+```
+
+## String Manipulation
+
+### string.sub
+
+Extracts a substring.
+
+<ParamField path="s" type="string" required>
+  Source string
+</ParamField>
+
+<ParamField path="i" type="integer" required>
+  Start position (negative counts from end)
+</ParamField>
+
+<ParamField path="j" type="integer">
+  End position (default: -1)
+</ParamField>
+
+<ResponseField name="substring" type="string">
+  Extracted substring
+</ResponseField>
+
+```lua
+string.sub("Hello World", 1, 5)   -- "Hello"
+string.sub("Hello World", 7)      -- "World"
+string.sub("Hello World", -5)     -- "World"
+```
+
+### string.rep
+
+Repeats a string.
+
+<ParamField path="s" type="string" required>
+  String to repeat
+</ParamField>
+
+<ParamField path="n" type="integer" required>
+  Number of repetitions
+</ParamField>
+
+<ParamField path="sep" type="string">
+  Separator between repetitions
+</ParamField>
+
+<ResponseField name="result" type="string">
+  Repeated string
+</ResponseField>
+
+```lua
+string.rep("ab", 3)        -- "ababab"
+string.rep("ab", 3, "-")  -- "ab-ab-ab"
+```
+
+### string.reverse
+
+Reverses a string.
+
+<ParamField path="s" type="string" required>
+  String to reverse
+</ParamField>
+
+<ResponseField name="result" type="string">
+  Reversed string
+</ResponseField>
+
+```lua
+string.reverse("hello")  -- "olleh"
+```
+
+## Pattern Matching
+
+### string.find
+
+Searches for a pattern in a string.
+
+<ParamField path="s" type="string" required>
+  String to search in
+</ParamField>
+
+<ParamField path="pattern" type="string" required>
+  Pattern to search for
+</ParamField>
+
+<ParamField path="init" type="integer">
+  Start position (default: 1)
+</ParamField>
+
+<ParamField path="plain" type="boolean">
+  If true, do plain search without patterns
+</ParamField>
+
+<ResponseField name="start" type="integer | nil">
+  Start position of match
+</ResponseField>
+
+<ResponseField name="end" type="integer | nil">
+  End position of match
+</ResponseField>
+
+<ResponseField name="···" type="any">
+  Captured substrings
+</ResponseField>
+
+```lua
+string.find("hello world", "world")      -- 7, 11
+string.find("hello world", "o")          -- 5, 5
+string.find("hello world", "(%w+)")      -- 1, 5, "hello"
+string.find("hello world", "bye")        -- nil
+```
+
+### string.match
+
+Searches for a pattern and returns captures.
+
+<ParamField path="s" type="string" required>
+  String to search in
+</ParamField>
+
+<ParamField path="pattern" type="string" required>
+  Pattern to match
+</ParamField>
+
+<ParamField path="init" type="integer">
+  Start position (default: 1)
+</ParamField>
+
+<ResponseField name="···" type="string">
+  Captured substrings
+</ResponseField>
+
+```lua
+string.match("hello 123", "%d+")            -- "123"
+string.match("name=value", "(%w+)=(%w+)")  -- "name", "value"
+```
+
+### string.gmatch
+
+Returns an iterator for pattern matches.
+
+<ParamField path="s" type="string" required>
+  String to search in
+</ParamField>
+
+<ParamField path="pattern" type="string" required>
+  Pattern to match
+</ParamField>
+
+<ResponseField name="iterator" type="function">
+  Iterator function
+</ResponseField>
+
+```lua
+for word in string.gmatch("hello world", "%w+") do
+  print(word)  -- prints "hello" then "world"
+end
+
+for key, value in string.gmatch("a=1 b=2", "(%w+)=(%w+)") do
+  print(key, value)  -- prints "a 1" then "b 2"
+end
+```
+
+### string.gsub
+
+Replaces pattern matches in a string.
+
+<ParamField path="s" type="string" required>
+  String to process
+</ParamField>
+
+<ParamField path="pattern" type="string" required>
+  Pattern to match
+</ParamField>
+
+<ParamField path="repl" type="string | table | function" required>
+  Replacement value
+</ParamField>
+
+<ParamField path="n" type="integer">
+  Maximum number of substitutions
+</ParamField>
+
+<ResponseField name="result" type="string">
+  Modified string
+</ResponseField>
+
+<ResponseField name="count" type="integer">
+  Number of substitutions made
+</ResponseField>
+
+```lua
+string.gsub("hello world", "(%w+)", "%1 %1")  -- "hello hello world world", 2
+string.gsub("hello world", "world", "Lua")    -- "hello Lua", 1
+string.gsub("hello", ".", "%1-")              -- "h-e-l-l-o-", 5
+
+-- With function replacement
+string.gsub("4+5 = $return 4+5$", "%$(.-)%$", function(s)
+  return load(s)()
+end)  -- "4+5 = 9", 1
+```
+
+## String Formatting
+
+### string.format
+
+Formats strings using printf-style formatting.
+
+<ParamField path="formatstring" type="string" required>
+  Format string with specifiers
+</ParamField>
+
+<ParamField path="···" type="any">
+  Values to format
+</ParamField>
+
+<ResponseField name="result" type="string">
+  Formatted string
+</ResponseField>
+
+```lua
+string.format("x = %d", 10)               -- "x = 10"
+string.format("%s %s", "hello", "world")  -- "hello world"
+string.format("%.2f", 3.14159)            -- "3.14"
+string.format("%05d", 42)                 -- "00042"
+string.format("%x", 255)                  -- "ff"
+```
+
+### string.pack
+
+Packs values into a binary string.
+
+<ParamField path="fmt" type="string" required>
+  Format string
+</ParamField>
+
+<ParamField path="···" type="any" required>
+  Values to pack
+</ParamField>
+
+<ResponseField name="binary" type="string">
+  Binary string
+</ResponseField>
+
+```lua
+string.pack("ii", 10, 20)  -- Pack two integers
+string.pack("c4", "test")  -- Pack 4-character string
+```
+
+### string.unpack
+
+Unpacks values from a binary string.
+
+<ParamField path="fmt" type="string" required>
+  Format string
+</ParamField>
+
+<ParamField path="s" type="string" required>
+  Binary string
+</ParamField>
+
+<ParamField path="pos" type="integer">
+  Start position (default: 1)
+</ParamField>
+
+<ResponseField name="···" type="any">
+  Unpacked values
+</ResponseField>
+
+<ResponseField name="pos" type="integer">
+  Next unread position
+</ResponseField>
+
+```lua
+local a, b = string.unpack("ii", data)
+```
+
+### string.packsize
+
+Returns the size of a packed string.
+
+<ParamField path="fmt" type="string" required>
+  Format string
+</ParamField>
+
+<ResponseField name="size" type="integer">
+  Size in bytes
+</ResponseField>
+
+```lua
+string.packsize("ii")  -- Size of two integers
+```
+
+## Other Functions
+
+### string.dump
+
+Returns a binary representation of a function.
+
+<ParamField path="function" type="function" required>
+  Lua function to dump
+</ParamField>
+
+<ParamField path="strip" type="boolean">
+  If true, strip debug information
+</ParamField>
+
+<ResponseField name="binary" type="string">
+  Binary representation
+</ResponseField>
+
+```lua
+local f = function() return 42 end
+local binary = string.dump(f)
+local loaded = load(binary)
+print(loaded())  -- 42
+```
+
+## Pattern Syntax
+
+Lua patterns use the following special characters:
+
+- `.` - All characters
+- `%a` - Letters
+- `%c` - Control characters
+- `%d` - Digits
+- `%g` - Printable characters except space
+- `%l` - Lowercase letters
+- `%p` - Punctuation
+- `%s` - Space characters
+- `%u` - Uppercase letters
+- `%w` - Alphanumeric characters
+- `%x` - Hexadecimal digits
+- `*` - 0 or more repetitions
+- `+` - 1 or more repetitions
+- `-` - 0 or more repetitions (lazy)
+- `?` - Optional (0 or 1)
+- `^` - Start of string
+- `$` - End of string
+- `( )` - Capture group
+
+```lua
+-- Examples
+string.match("test123", "%a+")      -- "test"
+string.match("test123", "%d+")      -- "123"
+string.match("abc", "^%l+$")        -- "abc"
+```

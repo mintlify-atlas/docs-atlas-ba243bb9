@@ -1,0 +1,288 @@
+---
+title: Value Access
+description: Functions for accessing values from the Lua stack
+---
+
+## Overview
+
+These functions allow you to retrieve values from the Lua stack and convert them to C types.
+
+## Functions
+
+### lua_tonumberx
+
+Converts the Lua value at the given index to a `lua_Number`.
+
+```c
+lua_Number lua_tonumberx(lua_State *L, int idx, int *isnum);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+<ParamField path="isnum" type="int*">
+  If not `NULL`, set to 1 if conversion succeeded, 0 otherwise
+</ParamField>
+
+**Returns:** The converted number, or 0 if conversion failed.
+
+**Example:**
+
+```c
+int isnum;
+lua_Number num = lua_tonumberx(L, 1, &isnum);
+if (isnum) {
+    printf("Number: %f\n", num);
+} else {
+    printf("Not a number\n");
+}
+```
+
+### lua_tointegerx
+
+Converts the Lua value at the given index to a `lua_Integer`.
+
+```c
+lua_Integer lua_tointegerx(lua_State *L, int idx, int *isnum);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+<ParamField path="isnum" type="int*">
+  If not `NULL`, set to 1 if conversion succeeded, 0 otherwise
+</ParamField>
+
+**Returns:** The converted integer, or 0 if conversion failed.
+
+**Example:**
+
+```c
+int isnum;
+lua_Integer num = lua_tointegerx(L, 1, &isnum);
+if (isnum) {
+    printf("Integer: %lld\n", num);
+} else {
+    printf("Not an integer\n");
+}
+```
+
+### lua_toboolean
+
+Converts the Lua value at the given index to a C boolean.
+
+```c
+int lua_toboolean(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+**Returns:** 1 if the value is true (anything except `false` and `nil`), 0 otherwise.
+
+**Example:**
+
+```c
+if (lua_toboolean(L, 1)) {
+    printf("First argument is true\n");
+} else {
+    printf("First argument is false or nil\n");
+}
+```
+
+### lua_tolstring
+
+Converts the Lua value at the given index to a C string.
+
+```c
+const char *lua_tolstring(lua_State *L, int idx, size_t *len);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+<ParamField path="len" type="size_t*">
+  If not `NULL`, set to the string length
+</ParamField>
+
+**Returns:** A pointer to the string, or `NULL` if the value is not a string or number.
+
+**Example:**
+
+```c
+size_t len;
+const char *str = lua_tolstring(L, 1, &len);
+if (str) {
+    printf("String: %s (length: %zu)\n", str, len);
+}
+```
+
+### lua_rawlen
+
+Returns the raw "length" of the value at the given index.
+
+```c
+lua_Unsigned lua_rawlen(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+**Returns:** For strings, the string length; for tables, the result of the length operator (`#`) with no metamethods; for userdata, the size of the memory block; 0 otherwise.
+
+**Example:**
+
+```c
+lua_Unsigned len = lua_rawlen(L, 1);
+printf("Raw length: %u\n", len);
+```
+
+### lua_tocfunction
+
+Converts the value at the given index to a C function.
+
+```c
+lua_CFunction lua_tocfunction(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+**Returns:** The C function, or `NULL` if the value is not a C function.
+
+**Example:**
+
+```c
+lua_CFunction func = lua_tocfunction(L, 1);
+if (func) {
+    printf("Got a C function\n");
+}
+```
+
+### lua_touserdata
+
+Returns the raw userdata pointer at the given index.
+
+```c
+void *lua_touserdata(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+**Returns:** The userdata pointer (for full or light userdata), or `NULL` otherwise.
+
+**Example:**
+
+```c
+void *ud = lua_touserdata(L, 1);
+if (ud) {
+    MyStruct *data = (MyStruct *)ud;
+    printf("Got userdata: %p\n", data);
+}
+```
+
+### lua_tothread
+
+Converts the value at the given index to a Lua thread.
+
+```c
+lua_State *lua_tothread(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+**Returns:** The thread, or `NULL` if the value is not a thread.
+
+**Example:**
+
+```c
+lua_State *thread = lua_tothread(L, 1);
+if (thread) {
+    printf("Got a thread\n");
+}
+```
+
+### lua_topointer
+
+Converts the value at the given index to a generic C pointer.
+
+```c
+const void *lua_topointer(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+**Returns:** A pointer representing the value (userdata, table, thread, string, or function), or `NULL` for other types.
+
+**Example:**
+
+```c
+const void *ptr = lua_topointer(L, 1);
+printf("Pointer representation: %p\n", ptr);
+```
+
+## Helper Macros
+
+Lua provides convenience macros for common conversions:
+
+```c
+#define lua_tonumber(L,i)  lua_tonumberx(L,(i),NULL)
+#define lua_tointeger(L,i) lua_tointegerx(L,(i),NULL)
+#define lua_tostring(L,i)  lua_tolstring(L, (i), NULL)
+```
+
+**Example:**
+
+```c
+lua_Number num = lua_tonumber(L, 1);
+lua_Integer int_val = lua_tointeger(L, 2);
+const char *str = lua_tostring(L, 3);
+```

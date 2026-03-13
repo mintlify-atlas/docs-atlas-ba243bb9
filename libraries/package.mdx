@@ -1,0 +1,419 @@
+---
+title: "Package Library"
+description: "Module loading and package management"
+---
+
+The package library provides facilities for loading and managing modules in Lua. It implements the `require` function and manages module paths.
+
+## Module Loading
+
+<CardGroup cols={2}>
+  <Card title="Loading">
+    `require` - Load modules
+  </Card>
+  <Card title="Searching">
+    `searchpath`, `searchers` - Find modules
+  </Card>
+  <Card title="Dynamic Libraries">
+    `loadlib` - Load C libraries
+  </Card>
+  <Card title="Configuration">
+    `path`, `cpath`, `config` - Package settings
+  </Card>
+</CardGroup>
+
+### require
+
+Loads and returns a module.
+
+<ParamField path="modname" type="string" required>
+  Module name
+</ParamField>
+
+<ResponseField name="module" type="any">
+  Module return value
+</ResponseField>
+
+```lua
+local json = require("json")
+local http = require("socket.http")
+
+-- Submodules
+local base64 = require("mime.base64")
+
+-- Module is cached
+local m1 = require("mymodule")
+local m2 = require("mymodule")
+print(m1 == m2)  -- true (same instance)
+```
+
+**How require works:**
+
+1. Check `package.loaded` for cached module
+2. Search for module using `package.searchers`
+3. Load and execute module
+4. Cache result in `package.loaded`
+5. Return module value
+
+### package.searchpath
+
+Searches for a file in a path.
+
+<ParamField path="name" type="string" required>
+  Module name
+</ParamField>
+
+<ParamField path="path" type="string" required>
+  Search path template
+</ParamField>
+
+<ParamField path="sep" type="string">
+  Module name separator (default: ".")
+</ParamField>
+
+<ParamField path="rep" type="string">
+  Directory separator (default: system-specific)
+</ParamField>
+
+<ResponseField name="filename" type="string | nil">
+  Found file path or nil
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if not found
+</ResponseField>
+
+```lua
+local path = package.searchpath("socket.http",
+  "/usr/local/share/lua/5.4/?.lua;/usr/share/lua/5.4/?.lua")
+  
+if path then
+  print("Found:", path)
+else
+  print("Not found")
+end
+```
+
+### package.loadlib
+
+Loads a C library.
+
+<ParamField path="libname" type="string" required>
+  Library path
+</ParamField>
+
+<ParamField path="funcname" type="string" required>
+  Function name to load
+</ParamField>
+
+<ResponseField name="func" type="function | nil">
+  Loaded function or nil
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if failed
+</ResponseField>
+
+```lua
+local func, err = package.loadlib("/usr/lib/mylib.so", "myfunction")
+if func then
+  func()  -- Call loaded function
+else
+  print("Error:", err)
+end
+```
+
+## Package Configuration
+
+### package.path
+
+Search path for Lua modules.
+
+```lua
+print(package.path)
+-- Example:
+-- ./?.lua;/usr/local/share/lua/5.4/?.lua;/usr/share/lua/5.4/?.lua
+
+-- Add custom path
+package.path = package.path .. ";/my/modules/?.lua"
+
+-- Module file locations:
+-- require("module") looks for:
+--   ./module.lua
+--   /usr/local/share/lua/5.4/module.lua
+--   /usr/share/lua/5.4/module.lua
+
+-- require("mylib.utils") looks for:
+--   ./mylib/utils.lua
+--   /usr/local/share/lua/5.4/mylib/utils.lua
+```
+
+### package.cpath
+
+Search path for C libraries.
+
+```lua
+print(package.cpath)
+-- Example:
+-- ./?.so;/usr/local/lib/lua/5.4/?.so;/usr/lib/lua/5.4/?.so
+
+-- Add custom path
+package.cpath = package.cpath .. ";/my/libs/?.so"
+```
+
+### package.config
+
+Configuration string with separator characters.
+
+```lua
+print(package.config)
+-- Unix: /\n;\n?\n!\n-
+-- Windows: \\\n;\n?\n!\n-
+
+local dir_sep = package.config:match("^([^\n]+)")
+print("Directory separator:", dir_sep)  -- "/" or "\\"
+```
+
+**Config components:**
+1. Directory separator (`/` or `\`)
+2. Path separator (`;`)
+3. Template substitution mark (`?`)
+4. Executable substitution mark (`!`)
+5. Ignore mark (`-`)
+
+### package.loaded
+
+Table of loaded modules.
+
+```lua
+-- Check if module is loaded
+if package.loaded["socket"] then
+  print("Socket module is loaded")
+end
+
+-- Unload module (next require will reload)
+package.loaded["mymodule"] = nil
+
+-- Pre-load module
+package.loaded["mymodule"] = {version = "1.0"}
+local m = require("mymodule")  -- Returns pre-loaded table
+```
+
+### package.preload
+
+Table of module loaders.
+
+```lua
+-- Register module without file
+package.preload["mymodule"] = function()
+  return {
+    hello = function()
+      print("Hello from mymodule")
+    end
+  }
+end
+
+local m = require("mymodule")  -- Calls preload function
+m.hello()
+```
+
+### package.searchers
+
+List of searcher functions for `require`.
+
+```lua
+-- Default searchers:
+-- 1. package.preload
+-- 2. Lua files (package.path)
+-- 3. C libraries (package.cpath)
+-- 4. C submodules
+
+-- Add custom searcher
+table.insert(package.searchers, function(modname)
+  if modname == "special" then
+    return function()
+      return {message = "Special module"}
+    end
+  end
+  return "\n\tno special module '" .. modname .. "'"
+end)
+
+local special = require("special")
+```
+
+## Creating Modules
+
+### Simple Module
+
+```lua
+-- mymodule.lua
+local M = {}
+
+function M.hello(name)
+  print("Hello, " .. name)
+end
+
+function M.goodbye(name)
+  print("Goodbye, " .. name)
+end
+
+return M
+```
+
+```lua
+-- Using the module
+local mymodule = require("mymodule")
+mymodule.hello("World")
+```
+
+### Module with Private Data
+
+```lua
+-- counter.lua
+local M = {}
+local count = 0  -- Private variable
+
+function M.increment()
+  count = count + 1
+  return count
+end
+
+function M.get()
+  return count
+end
+
+function M.reset()
+  count = 0
+end
+
+return M
+```
+
+### Module with Setup
+
+```lua
+-- database.lua
+local M = {}
+local connection = nil
+
+function M.connect(host, port)
+  connection = {host = host, port = port}
+  print("Connected to " .. host)
+end
+
+function M.query(sql)
+  if not connection then
+    error("Not connected")
+  end
+  -- Execute query
+end
+
+function M.close()
+  connection = nil
+  print("Connection closed")
+end
+
+return M
+```
+
+```lua
+local db = require("database")
+db.connect("localhost", 5432)
+db.query("SELECT * FROM users")
+db.close()
+```
+
+### OOP-Style Module
+
+```lua
+-- person.lua
+local Person = {}
+Person.__index = Person
+
+function Person.new(name, age)
+  local self = setmetatable({}, Person)
+  self.name = name
+  self.age = age
+  return self
+end
+
+function Person:greet()
+  print("Hello, I'm " .. self.name)
+end
+
+function Person:birthday()
+  self.age = self.age + 1
+  print(self.name .. " is now " .. self.age)
+end
+
+return Person
+```
+
+```lua
+local Person = require("person")
+
+local p = Person.new("Alice", 30)
+p:greet()
+p:birthday()
+```
+
+## Usage Examples
+
+### Dynamic Module Loading
+
+```lua
+local function tryRequire(modname)
+  local ok, module = pcall(require, modname)
+  if ok then
+    return module
+  else
+    print("Failed to load", modname)
+    return nil
+  end
+end
+
+local json = tryRequire("json") or tryRequire("cjson")
+```
+
+### Module Reloading
+
+```lua
+local function reloadModule(modname)
+  package.loaded[modname] = nil
+  return require(modname)
+end
+
+local mymodule = reloadModule("mymodule")
+```
+
+### Custom Module Paths
+
+```lua
+-- Add project-specific paths
+local function setupPaths()
+  local home = os.getenv("HOME")
+  package.path = string.format("%s;%s/?.lua;%s/?/init.lua",
+    package.path,
+    home .. "/.lua/modules",
+    home .. "/.lua/modules")
+end
+
+setupPaths()
+```
+
+### Lazy Loading
+
+```lua
+local function lazyModule(modname)
+  local mt = {}
+  mt.__index = function(t, key)
+    local module = require(modname)
+    setmetatable(t, {__index = module})
+    return module[key]
+  end
+  return setmetatable({}, mt)
+end
+
+local json = lazyModule("json")  -- Module not loaded yet
+local data = json.decode(str)    -- Module loaded on first use
+```

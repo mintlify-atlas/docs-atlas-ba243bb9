@@ -1,0 +1,573 @@
+---
+title: "Debug Library"
+description: "Debugging and introspection facilities"
+---
+
+The debug library provides functions for debugging and inspecting the internal state of Lua programs. These functions should be used with care as they can break encapsulation.
+
+<Warning>
+The debug library is intended for debugging and development. It should not be used in production code as it can compromise security and program stability.
+</Warning>
+
+## Stack Introspection
+
+<CardGroup cols={2}>
+  <Card title="Stack Information">
+    `getinfo`, `getlocal`, `setlocal`
+  </Card>
+  <Card title="Function Information">
+    `getupvalue`, `setupvalue`, `upvalueid`, `upvaluejoin`
+  </Card>
+  <Card title="Debugging">
+    `traceback`, `debug`, `sethook`, `gethook`
+  </Card>
+  <Card title="Metatables">
+    `getmetatable`, `setmetatable`, `getuservalue`, `setuservalue`
+  </Card>
+</CardGroup>
+
+### debug.getinfo
+
+Returns information about a function.
+
+<ParamField path="thread" type="thread">
+  Thread to inspect (omit for current thread)
+</ParamField>
+
+<ParamField path="f" type="function | integer" required>
+  Function or stack level
+</ParamField>
+
+<ParamField path="what" type="string">
+  Information to retrieve (default: "flnSrtu")
+</ParamField>
+
+<ResponseField name="info" type="table">
+  Information table
+</ResponseField>
+
+**What string characters:**
+- `n` - name and namewhat
+- `S` - source, short_src, linedefined, lastlinedefined, what
+- `l` - currentline
+- `t` - istailcall
+- `u` - nups, nparams, isvararg
+- `f` - func (the function itself)
+- `L` - activelines (table of active lines)
+- `r` - ftransfer, ntransfer
+
+```lua
+local function test(a, b)
+  local info = debug.getinfo(1, "nSl")
+  print("Function:", info.name)
+  print("Line:", info.currentline)
+  print("Source:", info.source)
+end
+
+test()
+
+-- Get info about a function
+local info = debug.getinfo(print)
+print(info.what)  -- "C"
+```
+
+### debug.getlocal
+
+Returns the name and value of a local variable.
+
+<ParamField path="thread" type="thread">
+  Thread to inspect
+</ParamField>
+
+<ParamField path="level" type="integer | function" required>
+  Stack level or function
+</ParamField>
+
+<ParamField path="local" type="integer" required>
+  Local variable index
+</ParamField>
+
+<ResponseField name="name" type="string">
+  Variable name
+</ResponseField>
+
+<ResponseField name="value" type="any">
+  Variable value
+</ResponseField>
+
+```lua
+local function test()
+  local x = 10
+  local y = 20
+  
+  local name, value = debug.getlocal(1, 1)
+  print(name, value)  -- "x" 10
+  
+  name, value = debug.getlocal(1, 2)
+  print(name, value)  -- "y" 20
+end
+
+test()
+```
+
+### debug.setlocal
+
+Sets the value of a local variable.
+
+<ParamField path="thread" type="thread">
+  Thread to modify
+</ParamField>
+
+<ParamField path="level" type="integer" required>
+  Stack level
+</ParamField>
+
+<ParamField path="local" type="integer" required>
+  Local variable index
+</ParamField>
+
+<ParamField path="value" type="any" required>
+  New value
+</ParamField>
+
+<ResponseField name="name" type="string">
+  Variable name
+</ResponseField>
+
+```lua
+local function test()
+  local x = 10
+  print(x)  -- 10
+  debug.setlocal(1, 1, 20)
+  print(x)  -- 20
+end
+
+test()
+```
+
+## Upvalue Manipulation
+
+### debug.getupvalue
+
+Returns the name and value of an upvalue.
+
+<ParamField path="f" type="function" required>
+  Function to inspect
+</ParamField>
+
+<ParamField path="up" type="integer" required>
+  Upvalue index
+</ParamField>
+
+<ResponseField name="name" type="string">
+  Upvalue name
+</ResponseField>
+
+<ResponseField name="value" type="any">
+  Upvalue value
+</ResponseField>
+
+```lua
+local counter = 0
+local function increment()
+  counter = counter + 1
+  return counter
+end
+
+local name, value = debug.getupvalue(increment, 1)
+print(name, value)  -- "counter" 0
+```
+
+### debug.setupvalue
+
+Sets the value of an upvalue.
+
+<ParamField path="f" type="function" required>
+  Function to modify
+</ParamField>
+
+<ParamField path="up" type="integer" required>
+  Upvalue index
+</ParamField>
+
+<ParamField path="value" type="any" required>
+  New value
+</ParamField>
+
+<ResponseField name="name" type="string">
+  Upvalue name
+</ResponseField>
+
+```lua
+local counter = 0
+local function increment()
+  counter = counter + 1
+  return counter
+end
+
+debug.setupvalue(increment, 1, 100)
+print(increment())  -- 101
+```
+
+### debug.upvalueid
+
+Returns a unique identifier for an upvalue.
+
+<ParamField path="f" type="function" required>
+  Function to inspect
+</ParamField>
+
+<ParamField path="n" type="integer" required>
+  Upvalue index
+</ParamField>
+
+<ResponseField name="id" type="lightuserdata">
+  Unique identifier
+</ResponseField>
+
+```lua
+local function f1()
+  local x = 1
+  return function() return x end
+end
+
+local function f2()
+  local x = 2
+  return function() return x end
+end
+
+local g1 = f1()
+local g2 = f2()
+
+print(debug.upvalueid(g1, 1) == debug.upvalueid(g2, 1))  -- false
+```
+
+### debug.upvaluejoin
+
+Makes two closures share an upvalue.
+
+<ParamField path="f1" type="function" required>
+  First function
+</ParamField>
+
+<ParamField path="n1" type="integer" required>
+  Upvalue index in f1
+</ParamField>
+
+<ParamField path="f2" type="function" required>
+  Second function
+</ParamField>
+
+<ParamField path="n2" type="integer" required>
+  Upvalue index in f2
+</ParamField>
+
+```lua
+local function f1()
+  local x = 1
+  return function() x = x + 1; return x end
+end
+
+local function f2()
+  local x = 100
+  return function() x = x + 1; return x end
+end
+
+local g1 = f1()
+local g2 = f2()
+
+print(g1())  -- 2
+print(g2())  -- 101
+
+debug.upvaluejoin(g1, 1, g2, 1)  -- Share upvalue
+print(g1())  -- 102
+print(g2())  -- 103
+```
+
+## Metatable Operations
+
+### debug.getmetatable
+
+Returns the metatable of an object.
+
+<ParamField path="value" type="any" required>
+  Value to inspect
+</ParamField>
+
+<ResponseField name="metatable" type="table | nil">
+  Metatable or nil
+</ResponseField>
+
+```lua
+local t = {}
+local mt = {__index = function() return "default" end}
+setmetatable(t, mt)
+
+local m = debug.getmetatable(t)
+print(m == mt)  -- true
+```
+
+### debug.setmetatable
+
+Sets the metatable of an object.
+
+<ParamField path="value" type="any" required>
+  Value to modify
+</ParamField>
+
+<ParamField path="table" type="table | nil" required>
+  New metatable
+</ParamField>
+
+<ResponseField name="value" type="any">
+  The original value
+</ResponseField>
+
+```lua
+local t = {}
+local mt = {__index = function() return "value" end}
+debug.setmetatable(t, mt)
+print(t.anything)  -- "value"
+```
+
+### debug.getuservalue
+
+Returns a user value associated with userdata.
+
+<ParamField path="u" type="userdata" required>
+  Userdata object
+</ParamField>
+
+<ParamField path="n" type="integer">
+  User value index (default: 1)
+</ParamField>
+
+<ResponseField name="value" type="any">
+  User value
+</ResponseField>
+
+<ResponseField name="success" type="boolean">
+  True if value exists
+</ResponseField>
+
+### debug.setuservalue
+
+Sets a user value for userdata.
+
+<ParamField path="udata" type="userdata" required>
+  Userdata object
+</ParamField>
+
+<ParamField path="value" type="any" required>
+  Value to set
+</ParamField>
+
+<ParamField path="n" type="integer">
+  User value index (default: 1)
+</ParamField>
+
+<ResponseField name="udata" type="userdata">
+  The userdata
+</ResponseField>
+
+## Hook System
+
+### debug.sethook
+
+Sets a debug hook function.
+
+<ParamField path="thread" type="thread">
+  Thread to set hook for
+</ParamField>
+
+<ParamField path="hook" type="function">
+  Hook function (nil to remove hook)
+</ParamField>
+
+<ParamField path="mask" type="string" required>
+  Event mask: "c" (call), "r" (return), "l" (line)
+</ParamField>
+
+<ParamField path="count" type="integer">
+  Call count for "count" events
+</ParamField>
+
+```lua
+-- Trace all function calls
+debug.sethook(function(event)
+  local info = debug.getinfo(2, "nS")
+  print(event, info.name or "?")
+end, "c")
+
+-- Line-by-line execution
+debug.sethook(function(event, line)
+  print("Line:", line)
+end, "l")
+
+-- Call count
+local count = 0
+debug.sethook(function()
+  count = count + 1
+  print("Instruction count:", count)
+end, "", 1000)  -- Every 1000 instructions
+
+-- Remove hook
+debug.sethook()
+```
+
+### debug.gethook
+
+Returns the current hook settings.
+
+<ParamField path="thread" type="thread">
+  Thread to inspect
+</ParamField>
+
+<ResponseField name="hook" type="function">
+  Hook function
+</ResponseField>
+
+<ResponseField name="mask" type="string">
+  Event mask
+</ResponseField>
+
+<ResponseField name="count" type="integer">
+  Call count
+</ResponseField>
+
+```lua
+local hook, mask, count = debug.gethook()
+if hook then
+  print("Hook active:", mask, count)
+else
+  print("No hook set")
+end
+```
+
+## Other Functions
+
+### debug.traceback
+
+Returns a stack traceback.
+
+<ParamField path="thread" type="thread">
+  Thread to trace
+</ParamField>
+
+<ParamField path="message" type="string">
+  Prefix message
+</ParamField>
+
+<ParamField path="level" type="integer">
+  Stack level to start from (default: 1)
+</ParamField>
+
+<ResponseField name="traceback" type="string">
+  Stack traceback
+</ResponseField>
+
+```lua
+local function f3()
+  print(debug.traceback())
+end
+
+local function f2()
+  f3()
+end
+
+local function f1()
+  f2()
+end
+
+f1()
+
+-- With message
+local tb = debug.traceback("Error occurred", 2)
+print(tb)
+```
+
+### debug.getregistry
+
+Returns the registry table.
+
+<ResponseField name="registry" type="table">
+  The registry table
+</ResponseField>
+
+```lua
+local reg = debug.getregistry()
+for k, v in pairs(reg) do
+  print(k, type(v))
+end
+```
+
+### debug.debug
+
+Enters an interactive debugging mode.
+
+```lua
+local function test()
+  local x = 10
+  debug.debug()  -- Enter debug mode
+  print(x)
+end
+
+test()
+```
+
+## Usage Examples
+
+### Function Call Tracer
+
+```lua
+local function trace()
+  local level = 1
+  print("\nCall Stack:")
+  while true do
+    local info = debug.getinfo(level, "nSl")
+    if not info then break end
+    print(string.format("  [%d] %s:%d in function '%s'",
+      level, info.short_src, info.currentline, info.name or "?"))
+    level = level + 1
+  end
+end
+```
+
+### Variable Inspector
+
+```lua
+local function inspectLocals(level)
+  level = level or 1
+  local i = 1
+  print("Local variables:")
+  while true do
+    local name, value = debug.getlocal(level + 1, i)
+    if not name then break end
+    print(string.format("  %s = %s", name, tostring(value)))
+    i = i + 1
+  end
+end
+```
+
+### Performance Profiler
+
+```lua
+local profile = {}
+
+local function startProfile()
+  debug.sethook(function(event)
+    if event == "call" then
+      local info = debug.getinfo(2, "nS")
+      local name = info.name or "anonymous"
+      profile[name] = (profile[name] or 0) + 1
+    end
+  end, "c")
+end
+
+local function stopProfile()
+  debug.sethook()
+  for name, count in pairs(profile) do
+    print(string.format("%s: %d calls", name, count))
+  end
+end
+```

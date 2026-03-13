@@ -1,0 +1,520 @@
+---
+title: 'Base Functions'
+description: 'Core Lua functions available in the global environment'
+---
+
+Lua's base library provides essential functions that are always available in the global environment. These functions handle basic operations, type checking, error handling, and more.
+
+## Type and Value Operations
+
+<Accordion title="type">
+Returns the type of its argument as a string.
+
+```lua
+type(value)
+```
+
+**Returns:** One of: `"nil"`, `"boolean"`, `"number"`, `"string"`, `"table"`, `"function"`, `"thread"`, `"userdata"`
+
+**Example:**
+```lua
+print(type("Hello"))     -- "string"
+print(type(42))          -- "number"
+print(type({}))          -- "table"
+print(type(print))       -- "function"
+print(type(true))        -- "boolean"
+print(type(nil))         -- "nil"
+```
+</Accordion>
+
+<Accordion title="tonumber">
+Converts its argument to a number.
+
+```lua
+tonumber(e [, base])
+```
+
+**Parameters:**
+- `e` - Value to convert
+- `base` - Optional base (2-36) for string conversion
+
+**Returns:** Number or `nil` if conversion fails
+
+**Example:**
+```lua
+print(tonumber("123"))        -- 123
+print(tonumber("FF", 16))     -- 255
+print(tonumber("1010", 2))    -- 10
+print(tonumber("abc"))        -- nil
+print(tonumber("  42.5  "))   -- 42.5
+```
+</Accordion>
+
+<Accordion title="tostring">
+Converts its argument to a string.
+
+```lua
+tostring(v)
+```
+
+**Returns:** String representation of the value
+
+**Example:**
+```lua
+print(tostring(42))          -- "42"
+print(tostring(true))        -- "true"
+print(tostring(nil))         -- "nil"
+print(tostring({1,2,3}))     -- "table: 0x..."
+print(tostring(print))       -- "function: 0x..."
+```
+</Accordion>
+
+## Error Handling
+
+<Accordion title="error">
+Terminates execution and raises an error.
+
+```lua
+error(message [, level])
+```
+
+**Parameters:**
+- `message` - Error message (any value)
+- `level` - Where to report the error (default: 1)
+
+**Example:**
+```lua
+function divide(a, b)
+  if b == 0 then
+    error("division by zero")
+  end
+  return a / b
+end
+
+function validateAge(age)
+  if type(age) ~= "number" then
+    error("age must be a number", 2)
+  end
+  if age < 0 then
+    error("age cannot be negative", 2)
+  end
+end
+```
+</Accordion>
+
+<Accordion title="assert">
+Raises an error if the value is false or nil.
+
+```lua
+assert(v [, message])
+```
+
+**Returns:** All arguments if `v` is truthy
+
+**Example:**
+```lua
+local file = assert(io.open("data.txt", "r"))
+
+local function factorial(n)
+  assert(n >= 0, "factorial requires non-negative number")
+  if n == 0 then return 1 end
+  return n * factorial(n - 1)
+end
+
+print(factorial(5))   -- 120
+print(factorial(-1))  -- Error: factorial requires non-negative number
+```
+</Accordion>
+
+<Accordion title="pcall">
+Calls a function in protected mode.
+
+```lua
+pcall(f [, arg1, ...])
+```
+
+**Returns:** `status`, `result` (or error message)
+
+**Example:**
+```lua
+local status, result = pcall(function()
+  return 10 / 2
+end)
+print(status, result)  -- true	5
+
+local status, err = pcall(function()
+  error("something went wrong")
+end)
+print(status, err)     -- false	something went wrong
+
+-- Safe file operations
+local status, file = pcall(io.open, "maybe_exists.txt", "r")
+if status then
+  print("File opened successfully")
+  file:close()
+else
+  print("Could not open file:", file)
+end
+```
+</Accordion>
+
+<Accordion title="xpcall">
+Calls a function with a custom error handler.
+
+```lua
+xpcall(f, msgh [, arg1, ...])
+```
+
+**Parameters:**
+- `f` - Function to call
+- `msgh` - Error handler function
+- `arg1, ...` - Arguments to `f`
+
+**Example:**
+```lua
+local function errorHandler(err)
+  return "Error occurred: " .. err
+end
+
+local status, result = xpcall(
+  function(a, b)
+    return a / b
+  end,
+  errorHandler,
+  10, 0  -- This will cause an error
+)
+
+print(status, result)  -- false	Error occurred: ...
+```
+</Accordion>
+
+## Metatables
+
+<Accordion title="getmetatable">
+Returns the metatable of an object.
+
+```lua
+getmetatable(object)
+```
+
+**Returns:** Metatable or `nil`
+
+**Example:**
+```lua
+local t = {}
+local mt = {__index = {x = 10}}
+setmetatable(t, mt)
+
+print(getmetatable(t) == mt)  -- true
+print(t.x)                     -- 10
+```
+</Accordion>
+
+<Accordion title="setmetatable">
+Sets the metatable for a table.
+
+```lua
+setmetatable(table, metatable)
+```
+
+**Returns:** The table
+
+**Example:**
+```lua
+local Vector = {}
+Vector.__index = Vector
+
+function Vector.new(x, y)
+  return setmetatable({x = x, y = y}, Vector)
+end
+
+function Vector:length()
+  return math.sqrt(self.x^2 + self.y^2)
+end
+
+local v = Vector.new(3, 4)
+print(v:length())  -- 5.0
+```
+</Accordion>
+
+## Raw Operations
+
+<Accordion title="rawequal">
+Checks equality without invoking metamethods.
+
+```lua
+rawequal(v1, v2)
+```
+
+**Example:**
+```lua
+local a = {1, 2, 3}
+local b = {1, 2, 3}
+print(rawequal(a, b))  -- false (different tables)
+print(rawequal(a, a))  -- true
+```
+</Accordion>
+
+<Accordion title="rawget">
+Gets a value from a table without invoking `__index`.
+
+```lua
+rawget(table, index)
+```
+
+**Example:**
+```lua
+local t = setmetatable({a = 1}, {__index = {b = 2}})
+print(t.b)          -- 2 (via __index)
+print(rawget(t, "b"))  -- nil (actual table content)
+```
+</Accordion>
+
+<Accordion title="rawset">
+Sets a value in a table without invoking `__newindex`.
+
+```lua
+rawset(table, index, value)
+```
+
+**Example:**
+```lua
+local t = {}
+rawset(t, "key", "value")
+print(t.key)  -- "value"
+```
+</Accordion>
+
+<Accordion title="rawlen">
+Returns the length without invoking `__len`.
+
+```lua
+rawlen(v)
+```
+
+**Example:**
+```lua
+local t = {1, 2, 3, 4, 5}
+print(rawlen(t))       -- 5
+print(rawlen("hello"))  -- 5
+```
+</Accordion>
+
+## Iteration
+
+<Accordion title="next">
+Returns the next key-value pair in a table.
+
+```lua
+next(table [, index])
+```
+
+**Example:**
+```lua
+local t = {a = 1, b = 2, c = 3}
+local k, v = next(t)
+print(k, v)  -- Prints one key-value pair
+
+k, v = next(t, k)
+print(k, v)  -- Prints next key-value pair
+```
+</Accordion>
+
+<Accordion title="pairs">
+Returns an iterator for key-value pairs.
+
+```lua
+pairs(t)
+```
+
+**Example:**
+```lua
+local person = {name = "Alice", age = 30, city = "NYC"}
+for key, value in pairs(person) do
+  print(key, value)
+end
+-- Output:
+-- name    Alice
+-- age     30
+-- city    NYC
+```
+</Accordion>
+
+<Accordion title="ipairs">
+Returns an iterator for array indices and values.
+
+```lua
+ipairs(t)
+```
+
+**Example:**
+```lua
+local fruits = {"apple", "banana", "cherry"}
+for i, fruit in ipairs(fruits) do
+  print(i, fruit)
+end
+-- Output:
+-- 1    apple
+-- 2    banana
+-- 3    cherry
+```
+</Accordion>
+
+## Loading and Execution
+
+<Accordion title="load">
+Loads a chunk from a string or function.
+
+```lua
+load(chunk [, chunkname [, mode [, env]]])
+```
+
+**Example:**
+```lua
+local func = load("return 2 + 2")
+print(func())  -- 4
+
+local code = [[
+  local x = 10
+  local y = 20
+  return x + y
+]]
+local chunk = load(code)
+print(chunk())  -- 30
+```
+</Accordion>
+
+<Accordion title="loadfile">
+Loads a chunk from a file.
+
+```lua
+loadfile([filename [, mode [, env]]])
+```
+
+**Example:**
+```lua
+local chunk = loadfile("config.lua")
+if chunk then
+  chunk()  -- Execute the loaded code
+end
+```
+</Accordion>
+
+<Accordion title="dofile">
+Executes a Lua file.
+
+```lua
+dofile([filename])
+```
+
+**Example:**
+```lua
+dofile("init.lua")  -- Load and execute init.lua
+```
+</Accordion>
+
+## Utility Functions
+
+<Accordion title="select">
+Returns arguments after a given index.
+
+```lua
+select(index, ...)
+```
+
+**Example:**
+```lua
+print(select(2, "a", "b", "c", "d"))  -- b c d
+print(select("#", "a", "b", "c"))    -- 3 (count)
+
+function sum(...)
+  local total = 0
+  for i = 1, select("#", ...) do
+    total = total + select(i, ...)
+  end
+  return total
+end
+
+print(sum(1, 2, 3, 4))  -- 10
+```
+</Accordion>
+
+<Accordion title="print">
+Prints values to standard output.
+
+```lua
+print(...)
+```
+
+**Example:**
+```lua
+print("Hello, World!")     -- Hello, World!
+print(1, 2, 3)              -- 1	2	3
+print("x =", 42, "y =", 17) -- x =	42	y =	17
+```
+</Accordion>
+
+<Accordion title="warn">
+Emits a warning message.
+
+```lua
+warn(...)
+```
+
+**Example:**
+```lua
+warn("This function is deprecated")
+warn("Use version 2.0 instead")
+```
+</Accordion>
+
+<Accordion title="collectgarbage">
+Controls the garbage collector.
+
+```lua
+collectgarbage([opt [, arg]])
+```
+
+**Options:**
+- `"collect"` - Performs a full collection
+- `"count"` - Returns memory in use (KB)
+- `"stop"` - Stops the collector
+- `"restart"` - Restarts the collector
+- `"step"` - Performs a collection step
+- `"isrunning"` - Returns true if collector is running
+
+**Example:**
+```lua
+local kb = collectgarbage("count")
+print(string.format("Memory: %.2f KB", kb))
+
+collectgarbage("collect")  -- Force garbage collection
+print("Collection complete")
+```
+</Accordion>
+
+## Global Variables
+
+<Accordion title="_G">
+The global environment table.
+
+**Example:**
+```lua
+_G.myGlobal = 42
+print(myGlobal)  -- 42
+
+-- Iterate over all globals
+for name, value in pairs(_G) do
+  print(name, type(value))
+end
+```
+</Accordion>
+
+<Accordion title="_VERSION">
+A string containing the Lua version.
+
+**Example:**
+```lua
+print(_VERSION)  -- Lua 5.4
+```
+</Accordion>

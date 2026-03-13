@@ -1,0 +1,417 @@
+---
+title: Building Lua
+description: Complete guide to building and customizing Lua from source
+---
+
+## Overview
+
+Lua is designed to be simple to build with minimal dependencies. The core interpreter compiles with just a standard C99 compiler and the standard C library.
+
+## Prerequisites
+
+### Required Tools
+
+- C compiler (GCC, Clang, MSVC, etc.)
+- Make (on Unix-like systems)
+- Standard C library
+
+### Optional Dependencies
+
+- `readline` library (for command-line editing)
+- `dl` library (for dynamic loading on Unix)
+
+## Quick Start
+
+### Unix/Linux/macOS
+
+```bash
+# Extract source
+tar -xzf lua-5.5.1.tar.gz
+cd lua-5.5.1
+
+# Build
+make linux      # For Linux
+make macosx     # For macOS
+make bsd        # For BSD
+
+# Install (requires root)
+sudo make install
+```
+
+### Generic Unix
+
+```bash
+make posix
+```
+
+### Windows
+
+```bash
+# With MinGW
+make mingw
+
+# With Visual Studio, use provided vcxproj files or:
+nmake /f makefile.win
+```
+
+## Build Targets
+
+The makefile provides several platform-specific targets:
+
+```makefile
+all:     # Builds core library and interpreter
+linux:   # Linux with readline and dynamic loading
+macosx:  # macOS
+bsd:     # BSD systems
+posix:   # Generic POSIX
+mingw:   # Windows with MinGW
+c89:     # Strict C89 compatibility
+```
+
+## Compiler Configuration
+
+### Makefile Settings
+
+From `makefile:79`:
+
+```makefile
+CC= gcc
+CFLAGS= -Wall -O2 $(MYCFLAGS) -fno-stack-protector -fno-common -march=native
+AR= ar rc
+RANLIB= ranlib
+RM= rm -f
+```
+
+### Custom Flags
+
+From `makefile:74`:
+
+```makefile
+MYCFLAGS= $(LOCAL) -std=c99 -DLUA_USE_LINUX
+MYLDFLAGS= -Wl,-E
+MYLIBS= -ldl
+```
+
+<Note>
+**Key compiler flags:**
+- `-std=c99`: Use C99 standard
+- `-DLUA_USE_LINUX`: Enable Linux-specific features
+- `-fno-stack-protector`: Disable stack protection for performance
+- `-fno-common`: Better code generation
+- `-march=native`: Optimize for current CPU
+</Note>
+
+## Warning Flags
+
+Lua uses comprehensive warning flags for code quality (`makefile:7`):
+
+```makefile
+CWARNSCPP= \
+  -Wfatal-errors \
+  -Wextra \
+  -Wshadow \
+  -Wundef \
+  -Wwrite-strings \
+  -Wredundant-decls \
+  -Wdisabled-optimization \
+  -Wdouble-promotion \
+  -Wmissing-declarations \
+  -Wconversion
+```
+
+GCC-specific warnings (`makefile:28`):
+
+```makefile
+CWARNGCC= \
+  -Wlogical-op \
+  -Wno-aggressive-loop-optimizations
+```
+
+C-only warnings (`makefile:34`):
+
+```makefile
+CWARNSC= -Wdeclaration-after-statement \
+  -Wmissing-prototypes \
+  -Wnested-externs \
+  -Wstrict-prototypes \
+  -Wc++-compat \
+  -Wold-style-definition
+```
+
+## Build Components
+
+### Core Library (liblua.a)
+
+From `makefile:93`:
+
+```makefile
+CORE_O= lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
+  lmem.o lobject.o lopcodes.o lparser.o lstate.o lstring.o ltable.o \
+  ltm.o lundump.o lvm.o lzio.o ltests.o
+```
+
+### Auxiliary Library
+
+```makefile
+AUX_O= lauxlib.o
+```
+
+### Standard Libraries
+
+```makefile  
+LIB_O= lbaselib.o ldblib.o liolib.o lmathlib.o loslib.o ltablib.o lstrlib.o \
+  lutf8lib.o loadlib.o lcorolib.o linit.o
+```
+
+### Interpreter
+
+```makefile
+LUA_O= lua.o
+```
+
+## Build Process
+
+### Building the Core Library
+
+```makefile
+$(CORE_T): $(CORE_O) $(AUX_O) $(LIB_O)
+  $(AR) $@ $?
+  $(RANLIB) $@
+```
+
+This creates `liblua.a`, a static library containing all Lua components.
+
+### Building the Interpreter
+
+```makefile
+$(LUA_T): $(LUA_O) $(CORE_T)
+  $(CC) -o $@ $(MYLDFLAGS) $(LUA_O) $(CORE_T) $(LIBS) $(MYLIBS) $(DL)
+```
+
+This links the interpreter with the core library.
+
+## Customization Options
+
+### Platform Definitions
+
+Define platform-specific features:
+
+```c
+-DLUA_USE_LINUX      // Linux features (readline, dl)
+-DLUA_USE_POSIX      // POSIX features
+-DLUA_USE_MACOSX     // macOS features
+-DLUA_USE_C89        // Strict C89 compatibility
+```
+
+### Feature Flags
+
+```c
+/* Enable additional features */
+-DLUA_COMPAT_5_3     // Compatibility with Lua 5.3
+-DLUA_USE_APICHECK   // Enable API assertions
+-DLUA_USE_CTYPE      // Use ctype.h functions
+```
+
+### Debug and Testing Flags
+
+From `makefile:45`:
+
+```c
+-DLUAI_ASSERT           // Turn on all assertions
+-DHARDSTACKTESTS        // Force stack reallocation at every opportunity  
+-DHARDMEMTESTS          // Force full GC at every allocation
+-DEMERGENCYGCTESTS      // Force emergency GC at every allocation
+-DEXTERNMEMCHECK        // Remove internal memory consistency checks
+-DMAXINDEXRK=k          // Limit range of RK instruction operands
+```
+
+<Tip>
+For development builds, use `-DLUAI_ASSERT -Og -g` for better debugging. For production, use `-O2` or `-O3` with no debug flags.
+</Tip>
+
+### Sanitizers
+
+From `makefile:63`:
+
+```bash
+# Undefined behavior detection
+make MYCFLAGS="-fsanitize=undefined"
+
+# Address sanitizer
+make MYCFLAGS="-fsanitize=address -fsanitize=pointer-compare -fsanitize=pointer-subtract"
+
+# Set environment variable for additional checks
+export ASAN_OPTIONS="detect_invalid_pointer_pairs=2"
+```
+
+## Custom Build Example
+
+### Embedded System Build
+
+```bash
+# Small footprint build for embedded systems
+make MYCFLAGS="-Os -DLUA_USE_C89" MYLIBS="" posix
+```
+
+### Performance Build
+
+```bash
+# Maximum performance build
+make MYCFLAGS="-O3 -march=native -DNDEBUG" linux
+```
+
+### Debug Build
+
+```bash
+# Debug build with assertions
+make MYCFLAGS="-Og -g -DLUAI_ASSERT" linux
+```
+
+## Static vs Dynamic Linking
+
+### Static Library
+
+Default build produces `liblua.a`:
+
+```bash
+# Link statically
+gcc -o myapp myapp.c liblua.a -lm -ldl
+```
+
+### Shared Library
+
+```bash
+# Build shared library
+gcc -shared -fPIC -o liblua.so $(CORE_O) $(AUX_O) $(LIB_O)
+
+# Link dynamically  
+gcc -o myapp myapp.c -L. -llua -lm -ldl
+```
+
+## Cross-Compilation
+
+```bash
+# Cross-compile for ARM
+make CC=arm-linux-gnueabihf-gcc \
+     AR="arm-linux-gnueabihf-ar rc" \
+     RANLIB=arm-linux-gnueabihf-ranlib \
+     posix
+```
+
+## Installation
+
+### Default Installation Paths
+
+```makefile
+INSTALL_TOP= /usr/local
+INSTALL_BIN= $(INSTALL_TOP)/bin
+INSTALL_INC= $(INSTALL_TOP)/include
+INSTALL_LIB= $(INSTALL_TOP)/lib
+INSTALL_MAN= $(INSTALL_TOP)/man/man1
+```
+
+### Custom Installation
+
+```bash
+# Install to custom prefix
+make install INSTALL_TOP=/opt/lua
+
+# Or set individual directories
+make install \
+  INSTALL_BIN=/usr/bin \
+  INSTALL_INC=/usr/include/lua5.5 \
+  INSTALL_LIB=/usr/lib/lua5.5
+```
+
+## Build Artifacts
+
+Successful build produces:
+
+- `liblua.a` - Static library
+- `lua` - Interpreter executable
+- `luac` - Compiler (if built separately)
+- `*.o` - Object files
+
+## Clean Targets
+
+```bash
+# Remove build artifacts
+make clean
+
+# Show configuration
+make echo
+```
+
+## Troubleshooting
+
+### Missing readline
+
+```bash
+# Install readline development package
+sudo apt-get install libreadline-dev  # Debian/Ubuntu
+sudo yum install readline-devel       # RedHat/CentOS
+
+# Or build without readline
+make posix
+```
+
+### Missing dl
+
+```bash
+# Build without dynamic loading
+make MYLIBS="" posix
+```
+
+### Compiler Errors
+
+```bash
+# Try generic POSIX build
+make posix
+
+# Or strict C89
+make c89
+```
+
+## Verification
+
+```bash
+# Test the build
+./lua -v
+# Lua 5.5.1  Copyright (C) 1994-2026 Lua.org, PUC-Rio
+
+# Run test suite (if available)
+make test
+```
+
+## Embedding in Applications
+
+After building, include in your C/C++ project:
+
+```c
+#include <lua.h>
+#include <lualib.h>
+#include <lauxlib.h>
+
+int main() {
+  lua_State *L = luaL_newstate();
+  luaL_openlibs(L);
+  
+  if (luaL_dostring(L, "print('Hello from Lua!')") != LUA_OK) {
+    fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+  }
+  
+  lua_close(L);
+  return 0;
+}
+```
+
+Compile and link:
+
+```bash
+gcc -o myapp myapp.c -I/usr/local/include -L/usr/local/lib -llua -lm -ldl
+```
+
+## See Also
+
+- [Performance Optimization](/advanced/performance)
+- [Memory Management](/advanced/memory-management)

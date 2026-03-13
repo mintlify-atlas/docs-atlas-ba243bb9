@@ -1,0 +1,233 @@
+---
+title: Memory Management
+description: Understanding Lua's memory management system and custom allocators
+---
+
+## Overview
+
+Lua uses a custom memory management system that provides full control over memory allocation through a user-defined allocator function. This design allows Lua to be embedded in environments with special memory requirements.
+
+## The Allocator Function
+
+All memory allocation in Lua goes through a single allocator function with the signature:
+
+```c
+void *frealloc (void *ud, void *ptr, size_t osize, size_t nsize);
+```
+
+### Parameters
+
+- `ud`: User data pointer passed during state creation
+- `ptr`: Pointer to the block being reallocated
+- `osize`: Original size of the block
+- `nsize`: New size requested
+
+### Behavior
+
+<Note>
+The allocator function must handle three distinct cases:
+
+1. **Free**: `frealloc(ud, p, x, 0)` frees block `p` and returns NULL
+2. **Allocate**: `frealloc(ud, NULL, x, s)` creates a new block of size `s`
+3. **Reallocate**: `frealloc(ud, b, x, y)` reallocates block `b` from size `x` to size `y`
+</Note>
+
+## Memory Allocation Implementation
+
+Lua's memory management is implemented in `lmem.c:176` with the core function:
+
+```c
+void *luaM_realloc_ (lua_State *L, void *block, size_t osize, size_t nsize) {
+  void *newblock;
+  global_State *g = G(L);
+  lua_assert((osize == 0) == (block == NULL));
+  newblock = firsttry(g, block, osize, nsize);
+  if (l_unlikely(newblock == NULL && nsize > 0)) {
+    newblock = tryagain(L, block, osize, nsize);
+    if (newblock == NULL)  /* still no memory? */
+      return NULL;  /* do not update 'GCdebt' */
+  }
+  lua_assert((nsize == 0) == (newblock == NULL));
+  g->GCdebt -= cast(l_mem, nsize) - cast(l_mem, osize);
+  return newblock;
+}
+```
+
+### Emergency Collection
+
+When allocation fails, Lua attempts an emergency garbage collection (`lmem.c:162`):
+
+```c
+static void *tryagain (lua_State *L, void *block,
+                       size_t osize, size_t nsize) {
+  global_State *g = G(L);
+  if (cantryagain(g)) {
+    luaC_fullgc(L, 1);  /* try to free some memory... */
+    return callfrealloc(g, block, osize, nsize);  /* try again */
+  }
+  else return NULL;  /* cannot run an emergency collection */
+}
+```
+
+<Tip>
+The emergency collection is only attempted when:
+- The Lua state is fully constructed
+- The collector is not already in the middle of a collection step
+</Tip>
+
+## GC Debt Tracking
+
+Lua tracks memory allocation through a "debt" system. Every allocation adjusts the `GCdebt` counter:
+
+```c
+g->GCdebt -= cast(l_mem, nsize) - cast(l_mem, osize);
+```
+
+When `GCdebt` becomes negative (too much memory allocated), the garbage collector runs to reclaim memory.
+
+## Array Management
+
+Lua provides specialized functions for managing dynamic arrays with geometric growth:
+
+### Growing Arrays
+
+From `lmem.c:97`:
+
+```c
+void *luaM_growaux_ (lua_State *L, void *block, int nelems, int *psize,
+                     unsigned size_elems, int limit, const char *what) {
+  void *newblock;
+  int size = *psize;
+  if (nelems + 1 <= size)  /* does one extra element still fit? */
+    return block;  /* nothing to be done */
+  if (size >= limit / 2) {  /* cannot double it? */
+    if (l_unlikely(size >= limit))  /* cannot grow even a little? */
+      luaG_runerror(L, "too many %s (limit is %d)", what, limit);
+    size = limit;  /* still have at least one free place */
+  }
+  else {
+    size *= 2;
+    if (size < MINSIZEARRAY)
+      size = MINSIZEARRAY;  /* minimum size */
+  }
+  // ...
+}
+```
+
+<Note>
+Arrays grow geometrically (doubling in size) with a minimum size of 4 elements (`MINSIZEARRAY` at `lmem.c:94`) to avoid overhead from repeated small reallocations.
+</Note>
+
+### Shrinking Arrays
+
+From `lmem.c:128`:
+
+```c
+void *luaM_shrinkvector_ (lua_State *L, void *block, int *size,
+                          int final_n, unsigned size_elem) {
+  void *newblock;
+  size_t oldsize = cast_sizet(*size) * size_elem;
+  size_t newsize = cast_sizet(final_n) * size_elem;
+  lua_assert(newsize <= oldsize);
+  newblock = luaM_saferealloc_(L, block, oldsize, newsize);
+  *size = final_n;
+  return newblock;
+}
+```
+
+## Custom Allocator Example
+
+```c
+#include <lua.h>
+#include <stdlib.h>
+
+/* Track total memory usage */
+typedef struct {
+  size_t total_bytes;
+  size_t max_bytes;
+} MemStats;
+
+void *tracking_allocator(void *ud, void *ptr, size_t osize, size_t nsize) {
+  MemStats *stats = (MemStats *)ud;
+  
+  if (nsize == 0) {
+    /* Free memory */
+    stats->total_bytes -= osize;
+    free(ptr);
+    return NULL;
+  }
+  else {
+    /* Allocate or reallocate */
+    void *newptr = realloc(ptr, nsize);
+    if (newptr == NULL) {
+      return NULL;  /* Allocation failed */
+    }
+    
+    /* Update statistics */
+    stats->total_bytes = stats->total_bytes - osize + nsize;
+    if (stats->total_bytes > stats->max_bytes) {
+      stats->max_bytes = stats->total_bytes;
+    }
+    
+    return newptr;
+  }
+}
+
+/* Usage */
+MemStats stats = {0, 0};
+lua_State *L = lua_newstate(tracking_allocator, &stats, 0);
+```
+
+## Memory Limits
+
+You can enforce memory limits in your custom allocator:
+
+```c
+#define MAX_MEMORY (10 * 1024 * 1024)  /* 10 MB */
+
+void *limited_allocator(void *ud, void *ptr, size_t osize, size_t nsize) {
+  MemStats *stats = (MemStats *)ud;
+  
+  if (nsize == 0) {
+    stats->total_bytes -= osize;
+    free(ptr);
+    return NULL;
+  }
+  
+  /* Check if new allocation would exceed limit */
+  size_t new_total = stats->total_bytes - osize + nsize;
+  if (new_total > MAX_MEMORY) {
+    return NULL;  /* Deny allocation */
+  }
+  
+  void *newptr = realloc(ptr, nsize);
+  if (newptr) {
+    stats->total_bytes = new_total;
+  }
+  
+  return newptr;
+}
+```
+
+<Tip>
+When your allocator returns NULL due to limits, Lua will attempt an emergency garbage collection before failing completely. This gives the GC a chance to free memory and retry.
+</Tip>
+
+## Best Practices
+
+1. **Thread Safety**: If using Lua in a multithreaded environment, ensure your allocator is thread-safe
+2. **Alignment**: Return properly aligned pointers for the target architecture
+3. **Consistency**: Always maintain the invariant that `(osize == 0) == (ptr == NULL)`
+4. **Error Handling**: Return NULL on allocation failure; Lua will handle the error
+5. **Performance**: Keep allocator operations fast; they're called frequently
+
+## Related Functions
+
+- `lua_newstate()`: Create a new Lua state with custom allocator
+- `lua_getallocf()`: Get the current allocator function
+- `lua_setallocf()`: Change the allocator function
+
+## See Also
+
+- [Garbage Collection](/advanced/garbage-collection)
+- [Performance Optimization](/advanced/performance)

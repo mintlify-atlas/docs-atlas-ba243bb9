@@ -1,0 +1,394 @@
+---
+title: Installation
+description: Install Lua on your system and get ready to start coding
+---
+
+## System Requirements
+
+Lua is extremely portable and has minimal requirements:
+
+- A C compiler (GCC, Clang, MSVC, etc.)
+- Standard C library
+- Approximately 1 MB of disk space for the complete installation
+
+<Note>
+Lua is written in ANSI C (C89/C90) and compiles cleanly as C or C++. The current development version uses C99 with Linux/POSIX extensions.
+</Note>
+
+## Quick Installation
+
+<Tabs>
+  <Tab title="Linux/Unix">
+    ### Building from Source
+
+    <Steps>
+      <Step title="Download Lua">
+        ```bash
+        wget https://www.lua.org/ftp/lua-5.5.1.tar.gz
+        tar xzf lua-5.5.1.tar.gz
+        cd lua-5.5.1
+        ```
+      </Step>
+
+      <Step title="Build Lua">
+        For Linux:
+        ```bash
+        make linux
+        ```
+
+        For generic Unix:
+        ```bash
+        make posix
+        ```
+
+        For macOS:
+        ```bash
+        make macosx
+        ```
+      </Step>
+
+      <Step title="Install">
+        ```bash
+        sudo make install
+        ```
+
+        This installs to `/usr/local` by default.
+      </Step>
+
+      <Step title="Verify Installation">
+        ```bash
+        lua -v
+        ```
+
+        You should see:
+        ```
+        Lua 5.5.1  Copyright (C) 1994-2026 Lua.org, PUC-Rio
+        ```
+      </Step>
+    </Steps>
+
+    ### Package Manager
+
+    **Ubuntu/Debian:**
+    ```bash
+    sudo apt-get update
+    sudo apt-get install lua5.4
+    ```
+
+    **Fedora:**
+    ```bash
+    sudo dnf install lua
+    ```
+
+    **Arch Linux:**
+    ```bash
+    sudo pacman -S lua
+    ```
+  </Tab>
+
+  <Tab title="macOS">
+    ### Using Homebrew
+
+    <Steps>
+      <Step title="Install Homebrew">
+        If you don't have Homebrew:
+        ```bash
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        ```
+      </Step>
+
+      <Step title="Install Lua">
+        ```bash
+        brew install lua
+        ```
+      </Step>
+
+      <Step title="Verify">
+        ```bash
+        lua -v
+        ```
+      </Step>
+    </Steps>
+
+    ### Building from Source
+
+    Follow the same steps as Linux, but use:
+    ```bash
+    make macosx
+    sudo make install
+    ```
+  </Tab>
+
+  <Tab title="Windows">
+    ### Using Pre-built Binaries
+
+    <Steps>
+      <Step title="Download Binaries">
+        Download the Windows binaries from:
+        - [LuaBinaries](http://luabinaries.sourceforge.net/)
+        - Official Lua website: [lua.org/download.html](https://www.lua.org/download.html)
+      </Step>
+
+      <Step title="Extract Files">
+        Extract the downloaded archive to a folder (e.g., `C:\Lua`)
+      </Step>
+
+      <Step title="Add to PATH">
+        Add the Lua installation directory to your system PATH:
+        1. Open System Properties → Environment Variables
+        2. Edit the PATH variable
+        3. Add `C:\Lua` (or your installation path)
+      </Step>
+
+      <Step title="Verify">
+        Open Command Prompt and run:
+        ```cmd
+        lua -v
+        ```
+      </Step>
+    </Steps>
+
+    ### Building with MinGW
+
+    If you have MinGW installed:
+    ```bash
+    make mingw
+    ```
+  </Tab>
+</Tabs>
+
+## Build Configuration
+
+The Lua source includes a developer's makefile with various configuration options.
+
+### Build Targets
+
+From the makefile:
+
+```makefile
+CORE_T= liblua.a
+LUA_T= lua
+
+# Core library objects
+CORE_O= lapi.o lcode.o lctype.o ldebug.o ldo.o ldump.o lfunc.o lgc.o llex.o \
+        lmem.o lobject.o lopcodes.o lparser.o lstate.o lstring.o ltable.o \
+        ltm.o lundump.o lvm.o lzio.o
+
+# Standard library objects  
+LIB_O= lbaselib.o ldblib.o liolib.o lmathlib.o loslib.o ltablib.o lstrlib.o \
+       lutf8lib.o loadlib.o lcorolib.o linit.o
+```
+
+### Customization Options
+
+You can customize the build by editing `luaconf.h` or defining compiler flags:
+
+```c
+// Example: Using C89 standard
+// MYCFLAGS= -std=c89 -DLUA_USE_C89
+
+// Example: Enable Linux features
+// MYCFLAGS= -std=c99 -DLUA_USE_LINUX
+```
+
+<Note>
+The development version uses C99 with Linux/POSIX extensions by default. For maximum portability, compile with C89 mode.
+</Note>
+
+## Interactive Mode
+
+Once installed, you can launch the Lua interactive interpreter:
+
+```bash
+lua
+```
+
+You'll see the Lua prompt:
+
+```
+Lua 5.5.1  Copyright (C) 1994-2026 Lua.org, PUC-Rio
+> 
+```
+
+From the interpreter source (`lua.c`):
+
+```c
+#define LUA_PROMPT		"> "
+#define LUA_PROMPT2		">> "
+```
+
+Try some commands:
+
+```lua
+> print("Hello, Lua!")
+Hello, Lua!
+> = 2 + 2
+4
+> for i = 1, 3 do print(i) end
+1
+2
+3
+```
+
+## Command-Line Options
+
+Lua supports several command-line options:
+
+```bash
+lua [options] [script [args]]
+```
+
+Available options from the source:
+
+```
+-e stat   Execute string 'stat'
+-i        Enter interactive mode after executing 'script'
+-l mod    Require library 'mod' into global 'mod'
+-l g=mod  Require library 'mod' into global 'g'
+-v        Show version information
+-E        Ignore environment variables
+-W        Turn warnings on
+--        Stop handling options
+-         Stop handling options and execute stdin
+```
+
+### Examples
+
+```bash
+# Execute a string
+lua -e "print('Hello from command line')"
+
+# Run a script
+lua myscript.lua
+
+# Run with arguments
+lua myscript.lua arg1 arg2
+
+# Load a library and enter interactive mode
+lua -l math -i
+
+# Show version
+lua -v
+```
+
+## Environment Variables
+
+Lua recognizes several environment variables:
+
+<CardGroup cols={2}>
+  <Card title="LUA_INIT / LUA_INIT_5_5">
+    Code to execute before running scripts. Prefix with '@' for a file.
+  </Card>
+  <Card title="LUA_PATH">
+    Search path for Lua modules (`.lua` files)
+  </Card>
+  <Card title="LUA_CPATH">
+    Search path for C modules (`.so`/`.dll` files)
+  </Card>
+  <Card title="LUA_READLINELIB">
+    Name of the readline library to load dynamically
+  </Card>
+</CardGroup>
+
+Example:
+
+```bash
+# Set initialization code
+export LUA_INIT='@/home/user/.luarc.lua'
+
+# Add to module search path
+export LUA_PATH='/usr/local/share/lua/5.5/?.lua;;'
+```
+
+## Building the Library Only
+
+To build just the Lua library (without the interpreter):
+
+```bash
+make liblua.a
+```
+
+This creates `liblua.a` which can be linked into your application:
+
+```bash
+gcc -o myapp myapp.c liblua.a -lm -ldl
+```
+
+## Verifying Your Installation
+
+Create a test file `test.lua`:
+
+```lua test.lua
+print("Lua version: " .. _VERSION)
+print("Hello from Lua!")
+
+-- Test some features
+local function factorial(n)
+  if n <= 1 then return 1
+  else return n * factorial(n - 1)
+  end
+end
+
+print("Factorial of 5: " .. factorial(5))
+```
+
+Run it:
+
+```bash
+lua test.lua
+```
+
+Expected output:
+
+```
+Lua version: Lua 5.5
+Hello from Lua!
+Factorial of 5: 120
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="'lua' command not found">
+    Make sure Lua's installation directory is in your PATH. On Linux/macOS, check with:
+    ```bash
+    which lua
+    echo $PATH
+    ```
+    
+    On Windows, verify the PATH in System Environment Variables.
+  </Accordion>
+
+  <Accordion title="Build errors on Linux">
+    Make sure you have the required development tools:
+    ```bash
+    sudo apt-get install build-essential libreadline-dev
+    ```
+  </Accordion>
+
+  <Accordion title="Missing math library errors">
+    When compiling programs that link with Lua, include the math library:
+    ```bash
+    gcc program.c -llua -lm
+    ```
+  </Accordion>
+
+  <Accordion title="Version mismatch">
+    If you have multiple Lua versions installed, use the full command name:
+    ```bash
+    lua5.4 -v
+    lua5.5 -v
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Write your first Lua program
+  </Card>
+  <Card title="Explore Features" icon="sparkles" href="/features">
+    Learn about Lua's capabilities
+  </Card>
+</CardGroup>

@@ -1,0 +1,500 @@
+---
+title: "I/O Library"
+description: "File input/output operations"
+---
+
+The I/O library provides functions for file manipulation. It offers two different styles for file manipulation: implicit file handles and explicit file handles.
+
+## File Operations
+
+<CardGroup cols={2}>
+  <Card title="Opening Files">
+    `open`, `popen`, `tmpfile`
+  </Card>
+  <Card title="Reading">
+    `read`, `lines`, file:read
+  </Card>
+  <Card title="Writing">
+    `write`, file:write, `flush`
+  </Card>
+  <Card title="File Positioning">
+    file:seek, `close`
+  </Card>
+</CardGroup>
+
+## Simple I/O Model
+
+### io.input
+
+Sets or gets the default input file.
+
+<ParamField path="file" type="string | file">
+  Filename or file handle (omit to get current)
+</ParamField>
+
+<ResponseField name="file" type="file">
+  Current input file handle
+</ResponseField>
+
+```lua
+io.input("data.txt")    -- Open file as default input
+io.input()              -- Get current input file
+```
+
+### io.output
+
+Sets or gets the default output file.
+
+<ParamField path="file" type="string | file">
+  Filename or file handle (omit to get current)
+</ParamField>
+
+<ResponseField name="file" type="file">
+  Current output file handle
+</ResponseField>
+
+```lua
+io.output("log.txt")    -- Open file as default output
+io.output()             -- Get current output file
+```
+
+### io.read
+
+Reads from the default input file.
+
+<ParamField path="···" type="string | integer">
+  Format specifiers
+</ParamField>
+
+<ResponseField name="···" type="string | number | nil">
+  Read values
+</ResponseField>
+
+```lua
+io.read("n")      -- Read a number
+io.read("l")      -- Read a line (without newline)
+io.read("L")      -- Read a line (with newline)
+io.read("a")      -- Read entire file
+io.read(100)      -- Read 100 bytes
+io.read("l", "n") -- Read line and number
+```
+
+### io.write
+
+Writes to the default output file.
+
+<ParamField path="···" type="string | number" required>
+  Values to write
+</ParamField>
+
+<ResponseField name="file" type="file">
+  Output file handle
+</ResponseField>
+
+```lua
+io.write("Hello ")
+io.write("World\n")
+io.write("x = ", 42, "\n")
+```
+
+### io.lines
+
+Returns an iterator over lines in a file.
+
+<ParamField path="filename" type="string">
+  File to read (nil for default input)
+</ParamField>
+
+<ParamField path="···" type="string">
+  Format specifiers
+</ParamField>
+
+<ResponseField name="iterator" type="function">
+  Line iterator
+</ResponseField>
+
+```lua
+-- Read all lines from file
+for line in io.lines("file.txt") do
+  print(line)
+end
+
+-- Read lines with pattern
+for num in io.lines("numbers.txt", "n") do
+  print(num)
+end
+```
+
+### io.close
+
+Closes a file.
+
+<ParamField path="file" type="file">
+  File handle (omit for default output)
+</ParamField>
+
+<ResponseField name="success" type="boolean">
+  True if successful
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if failed
+</ResponseField>
+
+```lua
+io.close()              -- Close default output
+io.close(file)          -- Close specific file
+```
+
+### io.flush
+
+Flushes the output buffer.
+
+<ResponseField name="success" type="boolean">
+  True if successful
+</ResponseField>
+
+```lua
+io.write("data")
+io.flush()  -- Ensure data is written
+```
+
+## Complete I/O Model
+
+### io.open
+
+Opens a file.
+
+<ParamField path="filename" type="string" required>
+  Path to file
+</ParamField>
+
+<ParamField path="mode" type="string">
+  Opening mode (default: "r")
+</ParamField>
+
+<ResponseField name="file" type="file | nil">
+  File handle or nil on error
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if failed
+</ResponseField>
+
+**Modes:**
+- `"r"` - Read mode (default)
+- `"w"` - Write mode (overwrite)
+- `"a"` - Append mode
+- `"r+"` - Read/write mode (existing file)
+- `"w+"` - Read/write mode (overwrite)
+- `"a+"` - Read/append mode
+- Add `"b"` for binary mode (e.g., `"rb"`, `"wb"`)
+
+```lua
+local file = io.open("data.txt", "r")
+if file then
+  local content = file:read("a")
+  file:close()
+else
+  print("Error opening file")
+end
+
+-- Write to file
+local file = io.open("output.txt", "w")
+file:write("Hello World\n")
+file:close()
+```
+
+### io.popen
+
+Opens a pipe to a program.
+
+<ParamField path="prog" type="string" required>
+  Program command
+</ParamField>
+
+<ParamField path="mode" type="string">
+  "r" for reading or "w" for writing (default: "r")
+</ParamField>
+
+<ResponseField name="file" type="file | nil">
+  File handle or nil on error
+</ResponseField>
+
+```lua
+local handle = io.popen("ls -l")
+if handle then
+  local result = handle:read("a")
+  handle:close()
+  print(result)
+end
+```
+
+### io.tmpfile
+
+Creates a temporary file.
+
+<ResponseField name="file" type="file">
+  Temporary file handle
+</ResponseField>
+
+```lua
+local tmpfile = io.tmpfile()
+tmpfile:write("temp data")
+tmpfile:seek("set", 0)
+print(tmpfile:read("a"))
+tmpfile:close()
+```
+
+### io.type
+
+Checks if an object is a file handle.
+
+<ParamField path="obj" type="any" required>
+  Object to check
+</ParamField>
+
+<ResponseField name="result" type="string | nil">
+  "file", "closed file", or nil
+</ResponseField>
+
+```lua
+local f = io.open("test.txt")
+print(io.type(f))       -- "file"
+f:close()
+print(io.type(f))       -- "closed file"
+print(io.type(123))     -- nil
+```
+
+## File Methods
+
+### file:read
+
+Reads from a file.
+
+<ParamField path="···" type="string | integer">
+  Format specifiers
+</ParamField>
+
+<ResponseField name="···" type="string | number | nil">
+  Read values
+</ResponseField>
+
+```lua
+local file = io.open("data.txt", "r")
+local line1 = file:read("l")    -- Read one line
+local line2 = file:read("l")    -- Read next line
+local all = file:read("a")      -- Read rest of file
+file:close()
+```
+
+### file:write
+
+Writes to a file.
+
+<ParamField path="···" type="string | number" required>
+  Values to write
+</ParamField>
+
+<ResponseField name="file" type="file">
+  File handle (for chaining)
+</ResponseField>
+
+```lua
+local file = io.open("output.txt", "w")
+file:write("Line 1\n")
+file:write("Line 2\n")
+file:close()
+
+-- Chaining
+file:write("a"):write("b"):write("c")
+```
+
+### file:lines
+
+Returns an iterator over file lines.
+
+<ParamField path="···" type="string">
+  Format specifiers
+</ParamField>
+
+<ResponseField name="iterator" type="function">
+  Line iterator
+</ResponseField>
+
+```lua
+local file = io.open("data.txt", "r")
+for line in file:lines() do
+  print(line)
+end
+file:close()
+```
+
+### file:seek
+
+Sets or gets the file position.
+
+<ParamField path="whence" type="string">
+  "set", "cur", or "end" (default: "cur")
+</ParamField>
+
+<ParamField path="offset" type="integer">
+  Offset in bytes (default: 0)
+</ParamField>
+
+<ResponseField name="pos" type="integer">
+  New file position
+</ResponseField>
+
+```lua
+local file = io.open("data.txt", "r")
+file:seek("set", 0)     -- Go to start
+file:seek("end", 0)     -- Go to end
+local pos = file:seek() -- Get current position
+file:seek("set", 100)   -- Go to byte 100
+file:close()
+```
+
+### file:setvbuf
+
+Sets the buffering mode.
+
+<ParamField path="mode" type="string" required>
+  "no", "full", or "line"
+</ParamField>
+
+<ParamField path="size" type="integer">
+  Buffer size
+</ParamField>
+
+```lua
+local file = io.open("output.txt", "w")
+file:setvbuf("line")    -- Line buffering
+file:setvbuf("full", 4096)  -- Full buffering with 4KB buffer
+```
+
+### file:flush
+
+Flushes a file's output buffer.
+
+<ResponseField name="success" type="boolean">
+  True if successful
+</ResponseField>
+
+```lua
+file:write("data")
+file:flush()  -- Ensure data is written
+```
+
+### file:close
+
+Closes a file.
+
+<ResponseField name="success" type="boolean">
+  True if successful
+</ResponseField>
+
+```lua
+local file = io.open("test.txt", "r")
+file:close()
+```
+
+## Standard Files
+
+### io.stdin
+
+Standard input file.
+
+```lua
+for line in io.stdin:lines() do
+  print(line)
+end
+```
+
+### io.stdout
+
+Standard output file.
+
+```lua
+io.stdout:write("Hello\n")
+io.stdout:flush()
+```
+
+### io.stderr
+
+Standard error file.
+
+```lua
+io.stderr:write("Error message\n")
+```
+
+## Usage Examples
+
+### Reading a File
+
+```lua
+-- Simple way
+local content = io.open("file.txt"):read("a")
+
+-- With error handling
+local file, err = io.open("file.txt", "r")
+if not file then
+  print("Error:", err)
+  return
+end
+local content = file:read("a")
+file:close()
+```
+
+### Writing a File
+
+```lua
+local file = io.open("output.txt", "w")
+file:write("Line 1\n")
+file:write("Line 2\n")
+file:close()
+```
+
+### Processing Lines
+
+```lua
+for line in io.lines("data.txt") do
+  if line:match("pattern") then
+    print(line)
+  end
+end
+```
+
+### Binary File Operations
+
+```lua
+-- Read binary file
+local file = io.open("image.png", "rb")
+local data = file:read("a")
+file:close()
+
+-- Write binary file
+local file = io.open("copy.png", "wb")
+file:write(data)
+file:close()
+```
+
+### Copying a File
+
+```lua
+local function copyFile(src, dest)
+  local input = io.open(src, "rb")
+  local output = io.open(dest, "wb")
+  
+  if not input or not output then
+    return false
+  end
+  
+  local data = input:read("a")
+  output:write(data)
+  
+  input:close()
+  output:close()
+  return true
+end
+```

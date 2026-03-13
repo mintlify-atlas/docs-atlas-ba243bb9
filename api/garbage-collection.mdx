@@ -1,0 +1,346 @@
+---
+title: Garbage Collection
+description: Functions for controlling Lua's garbage collector
+---
+
+## Overview
+
+Lua uses automatic memory management with a garbage collector. These functions allow you to control and monitor the garbage collector from C.
+
+## Main Function
+
+### lua_gc
+
+Controls the garbage collector.
+
+```c
+int lua_gc(lua_State *L, int what, ...);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="what" type="int" required>
+  The garbage collector operation to perform
+</ParamField>
+
+<ParamField path="..." type="variadic">
+  Additional arguments depending on the operation
+</ParamField>
+
+**Returns:** Depends on the operation (see below).
+
+## GC Operations
+
+### LUA_GCSTOP
+
+Stops the garbage collector.
+
+```c
+lua_gc(L, LUA_GCSTOP);
+```
+
+**Returns:** 0.
+
+**Example:**
+
+```c
+lua_gc(L, LUA_GCSTOP);
+printf("Garbage collector stopped\n");
+```
+
+### LUA_GCRESTART
+
+Restarts the garbage collector.
+
+```c
+lua_gc(L, LUA_GCRESTART);
+```
+
+**Returns:** 0.
+
+**Example:**
+
+```c
+lua_gc(L, LUA_GCRESTART);
+printf("Garbage collector restarted\n");
+```
+
+### LUA_GCCOLLECT
+
+Performs a full garbage collection cycle.
+
+```c
+lua_gc(L, LUA_GCCOLLECT);
+```
+
+**Returns:** 0.
+
+**Example:**
+
+```c
+lua_gc(L, LUA_GCCOLLECT);
+printf("Full GC cycle completed\n");
+```
+
+### LUA_GCCOUNT
+
+Returns the current amount of memory in use by Lua (in kilobytes).
+
+```c
+int kb = lua_gc(L, LUA_GCCOUNT);
+```
+
+**Returns:** Memory usage in KB.
+
+**Example:**
+
+```c
+int kb = lua_gc(L, LUA_GCCOUNT);
+printf("Lua memory usage: %d KB\n", kb);
+```
+
+### LUA_GCCOUNTB
+
+Returns the remainder of dividing the current memory usage by 1024.
+
+```c
+int bytes = lua_gc(L, LUA_GCCOUNTB);
+```
+
+**Returns:** Remainder in bytes.
+
+**Example:**
+
+```c
+int kb = lua_gc(L, LUA_GCCOUNT);
+int b = lua_gc(L, LUA_GCCOUNTB);
+printf("Lua memory usage: %d.%03d KB\n", kb, b);
+```
+
+### LUA_GCSTEP
+
+Performs an incremental step of garbage collection.
+
+```c
+int finished = lua_gc(L, LUA_GCSTEP, stepsize);
+```
+
+**Parameters:**
+- `stepsize`: The size of the step (larger values = more work)
+
+**Returns:** 1 if the step finished a collection cycle, 0 otherwise.
+
+**Example:**
+
+```c
+// Perform a small GC step
+if (lua_gc(L, LUA_GCSTEP, 100)) {
+    printf("GC cycle completed\n");
+}
+```
+
+### LUA_GCISRUNNING
+
+Returns whether the collector is running.
+
+```c
+int running = lua_gc(L, LUA_GCISRUNNING);
+```
+
+**Returns:** 1 if running, 0 if stopped.
+
+**Example:**
+
+```c
+if (lua_gc(L, LUA_GCISRUNNING)) {
+    printf("GC is running\n");
+} else {
+    printf("GC is stopped\n");
+}
+```
+
+### LUA_GCGEN
+
+Changes the collector to generational mode.
+
+```c
+lua_gc(L, LUA_GCGEN, minormul, majormul);
+```
+
+**Parameters:**
+- `minormul`: Minor collection multiplier
+- `majormul`: Major collection multiplier
+
+**Returns:** Previous mode.
+
+**Example:**
+
+```c
+lua_gc(L, LUA_GCGEN, 20, 100);
+printf("Switched to generational GC\n");
+```
+
+### LUA_GCINC
+
+Changes the collector to incremental mode.
+
+```c
+lua_gc(L, LUA_GCINC, pause, stepmul, stepsize);
+```
+
+**Parameters:**
+- `pause`: Pause percentage (controls when GC starts)
+- `stepmul`: Step multiplier (controls GC speed)
+- `stepsize`: Step size in KB
+
+**Returns:** Previous mode.
+
+**Example:**
+
+```c
+lua_gc(L, LUA_GCINC, 200, 100, 0);
+printf("Switched to incremental GC\n");
+```
+
+### LUA_GCPARAM
+
+Gets or sets a GC parameter.
+
+```c
+int old_value = lua_gc(L, LUA_GCPARAM, param, value);
+```
+
+**Parameters:**
+- `param`: The parameter to get/set (see below)
+- `value`: New value, or -1 to just query
+
+**Returns:** Previous value of the parameter.
+
+## GC Parameters
+
+### Generational Mode Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `LUA_GCPMINORMUL` | Controls frequency of minor collections |
+| `LUA_GCPMAJORMINOR` | Controls when to shift from major to minor |
+| `LUA_GCPMINORMAJOR` | Controls when to shift from minor to major |
+
+### Incremental Mode Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `LUA_GCPPAUSE` | Size of pause between successive GCs |
+| `LUA_GCPSTEPMUL` | GC "speed" relative to memory allocation |
+| `LUA_GCPSTEPSIZE` | GC granularity (step size) |
+
+**Example:**
+
+```c
+// Get current pause value
+int pause = lua_gc(L, LUA_GCPARAM, LUA_GCPPAUSE, -1);
+printf("Current GC pause: %d%%\n", pause);
+
+// Set new pause value
+int old_pause = lua_gc(L, LUA_GCPARAM, LUA_GCPPAUSE, 150);
+printf("Changed pause from %d%% to 150%%\n", old_pause);
+```
+
+## Complete Examples
+
+### Memory Monitoring
+
+```c
+void print_memory_usage(lua_State *L) {
+    int kb = lua_gc(L, LUA_GCCOUNT);
+    int b = lua_gc(L, LUA_GCCOUNTB);
+    printf("Memory in use: %d.%03d KB\n", kb, b);
+}
+
+void monitor_memory(lua_State *L) {
+    printf("Before operation: ");
+    print_memory_usage(L);
+    
+    // Perform some Lua operations
+    // ...
+    
+    printf("After operation: ");
+    print_memory_usage(L);
+    
+    // Force collection
+    lua_gc(L, LUA_GCCOLLECT);
+    
+    printf("After GC: ");
+    print_memory_usage(L);
+}
+```
+
+### Manual GC Control
+
+```c
+void perform_large_operation(lua_State *L) {
+    // Stop GC during critical section
+    lua_gc(L, LUA_GCSTOP);
+    printf("GC stopped for critical section\n");
+    
+    // Perform operations that allocate lots of memory
+    for (int i = 0; i < 1000; i++) {
+        lua_newtable(L);
+        // Fill table...
+        lua_setglobal(L, lua_pushfstring(L, "table_%d", i));
+    }
+    
+    // Restart GC
+    lua_gc(L, LUA_GCRESTART);
+    printf("GC restarted\n");
+    
+    // Optionally force a full collection
+    lua_gc(L, LUA_GCCOLLECT);
+    printf("Performed full collection\n");
+}
+```
+
+### Incremental GC Steps
+
+```c
+void gc_step_in_loop(lua_State *L) {
+    int iterations = 10000;
+    
+    for (int i = 0; i < iterations; i++) {
+        // Do some work
+        lua_newtable(L);
+        lua_pop(L, 1);
+        
+        // Perform small GC step every 100 iterations
+        if (i % 100 == 0) {
+            if (lua_gc(L, LUA_GCSTEP, 50)) {
+                printf("GC cycle completed at iteration %d\n", i);
+            }
+        }
+    }
+}
+```
+
+### Configuring GC for Performance
+
+```c
+void configure_gc_for_performance(lua_State *L) {
+    // Switch to generational mode (better for many short-lived objects)
+    lua_gc(L, LUA_GCGEN, 20, 100);
+    
+    printf("GC mode: generational\n");
+    printf("Memory before: %d KB\n", lua_gc(L, LUA_GCCOUNT));
+    
+    // Or switch to incremental with custom parameters
+    // lua_gc(L, LUA_GCINC, 200, 200, 1);
+}
+
+void configure_gc_for_low_memory(lua_State *L) {
+    // Aggressive incremental GC
+    lua_gc(L, LUA_GCINC, 120, 300, 0);
+    
+    printf("GC configured for low memory\n");
+}
+```

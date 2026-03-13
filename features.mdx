@@ -1,0 +1,292 @@
+---
+title: Key Features
+description: Explore the powerful features that make Lua a popular choice for scripting and embedding
+---
+
+## Language Features
+
+Lua provides a rich set of features while maintaining simplicity and efficiency.
+
+### Dynamic Typing
+
+Lua is dynamically typed. Variables don't have types; values do. All values carry their own type.
+
+```lua
+-- Variables can hold any type
+local x = 42          -- number
+x = "hello"           -- now a string
+x = {1, 2, 3}        -- now a table
+x = function() end   -- now a function
+```
+
+### Eight Basic Types
+
+Lua has eight basic types as defined in the source:
+
+```c
+#define LUA_TNIL		0
+#define LUA_TBOOLEAN		1
+#define LUA_TLIGHTUSERDATA	2
+#define LUA_TNUMBER		3
+#define LUA_TSTRING		4
+#define LUA_TTABLE		5
+#define LUA_TFUNCTION		6
+#define LUA_TUSERDATA		7
+#define LUA_TTHREAD		8
+```
+
+<CardGroup cols={2}>
+  <Card title="nil" icon="circle-xmark">
+    Represents the absence of a value
+  </Card>
+  <Card title="boolean" icon="toggle-on">
+    True or false values
+  </Card>
+  <Card title="number" icon="hashtag">
+    Double-precision floating-point numbers (integers and floats)
+  </Card>
+  <Card title="string" icon="quote-right">
+    Immutable sequences of characters
+  </Card>
+  <Card title="table" icon="table">
+    Associative arrays - the only data structure
+  </Card>
+  <Card title="function" icon="function">
+    First-class functions with closures
+  </Card>
+  <Card title="userdata" icon="cube">
+    Arbitrary C data stored in Lua
+  </Card>
+  <Card title="thread" icon="network-wired">
+    Independent threads of execution (coroutines)
+  </Card>
+</CardGroup>
+
+## Tables: The Universal Data Structure
+
+Tables are Lua's only data structuring mechanism. They can represent arrays, dictionaries, objects, and more.
+
+```lua
+-- Array-like table
+local array = {10, 20, 30, 40}
+print(array[1])  -- Output: 10 (1-indexed!)
+
+-- Dictionary-like table
+local person = {
+  name = "Alice",
+  age = 30,
+  city = "Wonderland"
+}
+
+-- Mixed keys
+local mixed = {
+  [1] = "first",
+  ["key"] = "value",
+  [true] = "boolean key"
+}
+```
+
+<Note>
+Lua arrays are **1-indexed** by convention, unlike most programming languages that use 0-indexing.
+</Note>
+
+## First-Class Functions
+
+Functions are first-class values in Lua. They can be stored in variables, passed as arguments, and returned from other functions.
+
+```lua
+-- Function as a value
+local greet = function(name)
+  return "Hello, " .. name
+end
+
+-- Higher-order function
+local function apply(func, value)
+  return func(value)
+end
+
+print(apply(greet, "World"))  -- Output: Hello, World
+
+-- Closures
+local function counter()
+  local count = 0
+  return function()
+    count = count + 1
+    return count
+  end
+end
+
+local c = counter()
+print(c())  -- Output: 1
+print(c())  -- Output: 2
+```
+
+## Coroutines
+
+Lua provides cooperative multithreading through coroutines. These are independent threads of execution that can be suspended and resumed.
+
+```lua
+local co = coroutine.create(function()
+  for i = 1, 3 do
+    print("Coroutine iteration:", i)
+    coroutine.yield()
+  end
+end)
+
+coroutine.resume(co)  -- Output: Coroutine iteration: 1
+coroutine.resume(co)  -- Output: Coroutine iteration: 2
+coroutine.resume(co)  -- Output: Coroutine iteration: 3
+```
+
+## Metatables and Metamethods
+
+Metatables allow you to change the behavior of tables, enabling operator overloading and more.
+
+```lua
+local vector = {x = 1, y = 2}
+local mt = {
+  __add = function(a, b)
+    return {x = a.x + b.x, y = a.y + b.y}
+  end,
+  __tostring = function(v)
+    return "(" .. v.x .. ", " .. v.y .. ")"
+  end
+}
+setmetatable(vector, mt)
+
+local v1 = {x = 1, y = 2}
+local v2 = {x = 3, y = 4}
+setmetatable(v1, mt)
+setmetatable(v2, mt)
+
+local v3 = v1 + v2
+print(v3.x, v3.y)  -- Output: 4 6
+```
+
+## Standard Libraries
+
+Lua comes with a comprehensive set of standard libraries:
+
+<Steps>
+  <Step title="Base Library">
+    Core functions like `print`, `type`, `pairs`, `ipairs`, etc.
+  </Step>
+  <Step title="String Library">
+    String manipulation functions and pattern matching
+  </Step>
+  <Step title="Table Library">
+    Functions for table manipulation
+  </Step>
+  <Step title="Math Library">
+    Mathematical functions and constants
+  </Step>
+  <Step title="I/O Library">
+    File input/output operations
+  </Step>
+  <Step title="OS Library">
+    Operating system facilities
+  </Step>
+  <Step title="Debug Library">
+    Debugging interface and introspection
+  </Step>
+  <Step title="UTF-8 Library">
+    UTF-8 string manipulation
+  </Step>
+  <Step title="Package Library">
+    Module loading and management
+  </Step>
+  <Step title="Coroutine Library">
+    Coroutine manipulation functions
+  </Step>
+</Steps>
+
+## Automatic Memory Management
+
+Lua features automatic memory management with an incremental garbage collector.
+
+```c
+// Garbage collection options from lua.h
+#define LUA_GCSTOP		0   // Stop garbage collection
+#define LUA_GCRESTART		1   // Restart garbage collection
+#define LUA_GCCOLLECT		2   // Perform full collection
+#define LUA_GCCOUNT		3   // Get memory usage
+#define LUA_GCGEN		7   // Change to generational mode
+#define LUA_GCINC		8   // Change to incremental mode
+```
+
+<Note>
+Lua 5.5 supports both incremental and generational garbage collection modes, allowing you to optimize for your specific use case.
+</Note>
+
+## Clean C API
+
+Lua provides a powerful yet simple C API for embedding and extending. All C-Lua communication happens through a virtual stack.
+
+```c
+// Example: Registering a C function with Lua
+static int my_function(lua_State *L) {
+  lua_Number n = lua_tonumber(L, 1);  // Get first argument
+  lua_pushnumber(L, n * 2);           // Push result
+  return 1;                           // Number of return values
+}
+
+// Register the function
+lua_register(L, "my_function", my_function);
+```
+
+## Error Handling
+
+Lua provides protected calls for error handling:
+
+```lua
+-- Using pcall for error handling
+local success, result = pcall(function()
+  return some_risky_operation()
+end)
+
+if success then
+  print("Result:", result)
+else
+  print("Error:", result)
+end
+```
+
+In C, protected calls are handled via:
+
+```c
+int status = lua_pcall(L, nargs, nresults, errfunc);
+if (status != LUA_OK) {
+  // Handle error
+  const char *msg = lua_tostring(L, -1);
+  fprintf(stderr, "Error: %s\n", msg);
+  lua_pop(L, 1);
+}
+```
+
+## Proper Tail Calls
+
+Lua implements proper tail calls, allowing unlimited recursion without stack overflow for tail-recursive functions.
+
+```lua
+local function factorial(n, acc)
+  acc = acc or 1
+  if n <= 1 then
+    return acc
+  else
+    return factorial(n - 1, n * acc)  -- Tail call
+  end
+end
+
+print(factorial(10000))  -- No stack overflow!
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Install Lua" icon="download" href="/installation">
+    Set up Lua on your system
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Start writing Lua code
+  </Card>
+</CardGroup>

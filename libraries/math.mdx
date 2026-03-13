@@ -1,0 +1,552 @@
+---
+title: "Math Library"
+description: "Mathematical functions and constants"
+---
+
+The math library provides standard mathematical functions. All trigonometric functions work in radians.
+
+## Constants
+
+### math.pi
+
+The value of π (pi).
+
+```lua
+print(math.pi)  -- 3.1415926535898
+```
+
+### math.huge
+
+A value larger than any other numeric value (infinity).
+
+```lua
+print(math.huge)     -- inf
+print(1 / math.huge) -- 0.0
+```
+
+### math.maxinteger
+
+The maximum value for an integer.
+
+```lua
+print(math.maxinteger)  -- 9223372036854775807 (on 64-bit)
+```
+
+### math.mininteger
+
+The minimum value for an integer.
+
+```lua
+print(math.mininteger)  -- -9223372036854775808 (on 64-bit)
+```
+
+## Basic Functions
+
+<CardGroup cols={2}>
+  <Card title="Arithmetic">
+    `abs`, `min`, `max`, `sqrt`
+  </Card>
+  <Card title="Rounding">
+    `floor`, `ceil`, `modf`
+  </Card>
+  <Card title="Trigonometry">
+    `sin`, `cos`, `tan`, `asin`, `acos`, `atan`
+  </Card>
+  <Card title="Exponential">
+    `exp`, `log`, `pow`
+  </Card>
+</CardGroup>
+
+### math.abs
+
+Returns the absolute value.
+
+<ParamField path="x" type="number" required>
+  Input value
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Absolute value of x
+</ResponseField>
+
+```lua
+math.abs(-10)   -- 10
+math.abs(5.5)   -- 5.5
+math.abs(0)     -- 0
+```
+
+### math.min
+
+Returns the minimum value among arguments.
+
+<ParamField path="x" type="number" required>
+  First value
+</ParamField>
+
+<ParamField path="···" type="number" required>
+  Additional values
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Minimum value
+</ResponseField>
+
+```lua
+math.min(1, 2, 3)       -- 1
+math.min(5, -3, 0, 7)   -- -3
+```
+
+### math.max
+
+Returns the maximum value among arguments.
+
+<ParamField path="x" type="number" required>
+  First value
+</ParamField>
+
+<ParamField path="···" type="number" required>
+  Additional values
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Maximum value
+</ResponseField>
+
+```lua
+math.max(1, 2, 3)       -- 3
+math.max(5, -3, 0, 7)   -- 7
+```
+
+### math.sqrt
+
+Returns the square root.
+
+<ParamField path="x" type="number" required>
+  Input value (must be non-negative)
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Square root of x
+</ResponseField>
+
+```lua
+math.sqrt(16)    -- 4.0
+math.sqrt(2)     -- 1.4142135623731
+```
+
+## Rounding Functions
+
+### math.floor
+
+Returns the largest integer smaller than or equal to x.
+
+<ParamField path="x" type="number" required>
+  Input value
+</ParamField>
+
+<ResponseField name="result" type="integer | number">
+  Floor of x
+</ResponseField>
+
+```lua
+math.floor(3.7)    -- 3
+math.floor(-3.7)   -- -4
+math.floor(5)      -- 5
+```
+
+### math.ceil
+
+Returns the smallest integer larger than or equal to x.
+
+<ParamField path="x" type="number" required>
+  Input value
+</ParamField>
+
+<ResponseField name="result" type="integer | number">
+  Ceiling of x
+</ResponseField>
+
+```lua
+math.ceil(3.2)    -- 4
+math.ceil(-3.2)   -- -3
+math.ceil(5)      -- 5
+```
+
+### math.modf
+
+Returns the integral and fractional parts of x.
+
+<ParamField path="x" type="number" required>
+  Input value
+</ParamField>
+
+<ResponseField name="int" type="integer | number">
+  Integral part
+</ResponseField>
+
+<ResponseField name="frac" type="number">
+  Fractional part
+</ResponseField>
+
+```lua
+math.modf(3.75)    -- 3, 0.75
+math.modf(-3.75)   -- -3, -0.75
+math.modf(5)       -- 5, 0.0
+```
+
+### math.fmod
+
+Returns the remainder of x/y.
+
+<ParamField path="x" type="number" required>
+  Dividend
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  Divisor
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Remainder of x/y
+</ResponseField>
+
+```lua
+math.fmod(10, 3)    -- 1.0
+math.fmod(-10, 3)   -- -1.0
+```
+
+## Trigonometric Functions
+
+### math.sin
+
+Returns the sine of x (in radians).
+
+<ParamField path="x" type="number" required>
+  Angle in radians
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Sine of x
+</ResponseField>
+
+```lua
+math.sin(0)              -- 0.0
+math.sin(math.pi / 2)    -- 1.0
+```
+
+### math.cos
+
+Returns the cosine of x (in radians).
+
+<ParamField path="x" type="number" required>
+  Angle in radians
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Cosine of x
+</ResponseField>
+
+```lua
+math.cos(0)              -- 1.0
+math.cos(math.pi)        -- -1.0
+```
+
+### math.tan
+
+Returns the tangent of x (in radians).
+
+<ParamField path="x" type="number" required>
+  Angle in radians
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Tangent of x
+</ResponseField>
+
+```lua
+math.tan(0)              -- 0.0
+math.tan(math.pi / 4)    -- 1.0
+```
+
+### math.asin
+
+Returns the arc sine of x (result in radians).
+
+<ParamField path="x" type="number" required>
+  Value between -1 and 1
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Arc sine of x in radians
+</ResponseField>
+
+```lua
+math.asin(0)    -- 0.0
+math.asin(1)    -- 1.5707963267949 (pi/2)
+```
+
+### math.acos
+
+Returns the arc cosine of x (result in radians).
+
+<ParamField path="x" type="number" required>
+  Value between -1 and 1
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Arc cosine of x in radians
+</ResponseField>
+
+```lua
+math.acos(1)    -- 0.0
+math.acos(0)    -- 1.5707963267949 (pi/2)
+```
+
+### math.atan
+
+Returns the arc tangent of y/x (result in radians).
+
+<ParamField path="y" type="number" required>
+  Y coordinate
+</ParamField>
+
+<ParamField path="x" type="number">
+  X coordinate (default: 1)
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Arc tangent in radians
+</ResponseField>
+
+```lua
+math.atan(0)        -- 0.0
+math.atan(1)        -- 0.78539816339745 (pi/4)
+math.atan(1, 1)     -- 0.78539816339745 (pi/4)
+math.atan(1, -1)    -- 2.3561944901923 (3*pi/4)
+```
+
+### math.deg
+
+Converts radians to degrees.
+
+<ParamField path="x" type="number" required>
+  Angle in radians
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Angle in degrees
+</ResponseField>
+
+```lua
+math.deg(math.pi)      -- 180.0
+math.deg(math.pi / 2)  -- 90.0
+```
+
+### math.rad
+
+Converts degrees to radians.
+
+<ParamField path="x" type="number" required>
+  Angle in degrees
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Angle in radians
+</ResponseField>
+
+```lua
+math.rad(180)   -- 3.1415926535898 (pi)
+math.rad(90)    -- 1.5707963267949 (pi/2)
+```
+
+## Exponential and Logarithmic
+
+### math.exp
+
+Returns e^x.
+
+<ParamField path="x" type="number" required>
+  Exponent
+</ParamField>
+
+<ResponseField name="result" type="number">
+  e raised to the power of x
+</ResponseField>
+
+```lua
+math.exp(0)     -- 1.0
+math.exp(1)     -- 2.718281828459
+```
+
+### math.log
+
+Returns the logarithm of x.
+
+<ParamField path="x" type="number" required>
+  Value (must be positive)
+</ParamField>
+
+<ParamField path="base" type="number">
+  Logarithm base (default: e)
+</ParamField>
+
+<ResponseField name="result" type="number">
+  Logarithm of x
+</ResponseField>
+
+```lua
+math.log(math.exp(1))  -- 1.0 (natural log)
+math.log(100, 10)      -- 2.0 (log base 10)
+math.log(8, 2)         -- 3.0 (log base 2)
+```
+
+## Floating Point Manipulation
+
+### math.frexp
+
+Decomposes x into mantissa and exponent.
+
+<ParamField path="x" type="number" required>
+  Input value
+</ParamField>
+
+<ResponseField name="m" type="number">
+  Mantissa (0.5 ≤ |m| &lt; 1.0)
+</ResponseField>
+
+<ResponseField name="e" type="integer">
+  Exponent (x = m * 2^e)
+</ResponseField>
+
+```lua
+local m, e = math.frexp(8)  -- m = 0.5, e = 4 (0.5 * 2^4 = 8)
+```
+
+### math.ldexp
+
+Computes m * 2^e.
+
+<ParamField path="m" type="number" required>
+  Mantissa
+</ParamField>
+
+<ParamField path="e" type="integer" required>
+  Exponent
+</ParamField>
+
+<ResponseField name="result" type="number">
+  m * 2^e
+</ResponseField>
+
+```lua
+math.ldexp(0.5, 4)  -- 8.0 (0.5 * 2^4)
+```
+
+## Random Numbers
+
+### math.random
+
+Generates pseudo-random numbers.
+
+<ParamField path="m" type="integer">
+  Upper bound (1 to m), or with n: lower bound
+</ParamField>
+
+<ParamField path="n" type="integer">
+  Upper bound (m to n)
+</ParamField>
+
+<ResponseField name="result" type="number | integer">
+  Random value
+</ResponseField>
+
+```lua
+math.random()       -- Random float in [0, 1)
+math.random(10)     -- Random integer in [1, 10]
+math.random(5, 10)  -- Random integer in [5, 10]
+math.random(0)      -- Random 64-bit integer
+```
+
+### math.randomseed
+
+Sets the seed for the random number generator.
+
+<ParamField path="x" type="integer">
+  Seed value (uses time if omitted)
+</ParamField>
+
+<ParamField path="y" type="integer">
+  Second seed component
+</ParamField>
+
+<ResponseField name="seed1" type="integer">
+  First seed component used
+</ResponseField>
+
+<ResponseField name="seed2" type="integer">
+  Second seed component used
+</ResponseField>
+
+```lua
+math.randomseed(12345)  -- Set specific seed
+math.randomseed()       -- Set random seed from time
+```
+
+## Type Checking
+
+### math.type
+
+Returns the type of a numeric value.
+
+<ParamField path="x" type="any" required>
+  Value to check
+</ParamField>
+
+<ResponseField name="result" type="string | nil">
+  "integer", "float", or nil if not a number
+</ResponseField>
+
+```lua
+math.type(3)       -- "integer"
+math.type(3.0)     -- "float"
+math.type(3.5)     -- "float"
+math.type("3")     -- nil
+```
+
+### math.tointeger
+
+Converts a number to an integer.
+
+<ParamField path="x" type="any" required>
+  Value to convert
+</ParamField>
+
+<ResponseField name="result" type="integer | nil">
+  Integer value or nil if not convertible
+</ResponseField>
+
+```lua
+math.tointeger(3.0)    -- 3
+math.tointeger(3.5)    -- nil
+math.tointeger("3")    -- nil
+```
+
+### math.ult
+
+Compares integers as unsigned values.
+
+<ParamField path="m" type="integer" required>
+  First integer
+</ParamField>
+
+<ParamField path="n" type="integer" required>
+  Second integer
+</ParamField>
+
+<ResponseField name="result" type="boolean">
+  True if m < n (unsigned comparison)
+</ResponseField>
+
+```lua
+math.ult(-1, 1)  -- false (unsigned: -1 is very large)
+```

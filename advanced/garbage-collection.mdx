@@ -1,0 +1,330 @@
+---
+title: Garbage Collection
+description: Deep dive into Lua's incremental and generational garbage collectors
+---
+
+## Overview
+
+Lua implements an automatic memory management system with two collection modes: incremental and generational. The garbage collector automatically reclaims memory used by objects that are no longer reachable from the program.
+
+## Collection Modes
+
+Lua supports two garbage collection modes, controlled via `lua_gc()`:
+
+### Incremental Mode (KGC_INC)
+
+The default mode that performs collection in small incremental steps interleaved with program execution. This mode minimizes pause times but may use more total CPU time.
+
+### Generational Mode (KGC_GENMINOR/KGC_GENMAJOR)
+
+Optimized for programs where most objects die young. Uses minor collections to clean young objects and occasional major collections for full cleanup.
+
+<Note>
+Generational mode typically provides better performance for programs with high allocation rates and short-lived objects.
+</Note>
+
+## Tri-Color Marking
+
+Lua's GC uses a tri-color marking scheme defined in `lgc.h:18`:
+
+- **White**: Unmarked objects that may be collected
+- **Gray**: Marked objects whose references haven't been scanned
+- **Black**: Fully marked objects with all references scanned
+
+```c
+#define iswhite(x)      testbits((x)->marked, WHITEBITS)
+#define isblack(x)      testbit((x)->marked, BLACKBIT)
+#define isgray(x)       (!testbits((x)->marked, WHITEBITS | bitmask(BLACKBIT)))
+```
+
+<Tip>
+The main invariant during marking is that a black object can never point to a white object. This invariant is maintained through write barriers.
+</Tip>
+
+## Object Ages (Generational Mode)
+
+In generational mode, objects progress through age stages (`lgc.h:110`):
+
+- `G_NEW` (0): Created in current cycle
+- `G_SURVIVAL` (1): Survived one cycle
+- `G_OLD0` (2): Marked old by forward barrier
+- `G_OLD1` (3): First full cycle as old
+- `G_OLD` (4): Really old (not visited)
+- `G_TOUCHED1` (5): Old object touched this cycle
+- `G_TOUCHED2` (6): Old object touched in previous cycle
+
+```c
+#define getage(o)    ((o)->marked & AGEBITS)
+#define setage(o,a)  ((o)->marked = cast_byte(((o)->marked & (~AGEBITS)) | a))
+#define isold(o)     (getage(o) > G_SURVIVAL)
+```
+
+## GC States
+
+The collector progresses through several states (`lgc.h:35`):
+
+```c
+#define GCSpropagate   0  /* Marking phase */
+#define GCSenteratomic 1  /* Entering atomic phase */
+#define GCSatomic      2  /* Atomic marking phase */
+#define GCSswpallgc    3  /* Sweep all objects */
+#define GCSswpfinobj   4  /* Sweep finalizable objects */
+#define GCSswptobefnz  5  /* Sweep to-be-finalized */
+#define GCSswpend      6  /* Sweep end */
+#define GCScallfin     7  /* Call finalizers */
+#define GCSpause       8  /* Paused between cycles */
+```
+
+## Collection Phases
+
+### 1. Propagate Phase
+
+Marks objects starting from root set (registry, main thread, metatables). Objects are traversed and turned from white to gray, then gray to black.
+
+From `lgc.c:727`:
+
+```c
+static l_mem propagatemark (global_State *g) {
+  GCObject *o = g->gray;
+  nw2black(o);
+  g->gray = *getgclist(o);  /* remove from 'gray' list */
+  switch (o->tt) {
+    case LUA_VTABLE: return traversetable(g, gco2t(o));
+    case LUA_VUSERDATA: return traverseudata(g, gco2u(o));
+    case LUA_VLCL: return traverseLclosure(g, gco2lcl(o));
+    case LUA_VCCL: return traverseCclosure(g, gco2ccl(o));
+    case LUA_VPROTO: return traverseproto(g, gco2p(o));
+    case LUA_VTHREAD: return traversethread(g, gco2th(o));
+    default: lua_assert(0); return 0;
+  }
+}
+```
+
+### 2. Atomic Phase
+
+Performs atomic operations that cannot be interrupted. Handles weak tables, ephemeron tables, and finalizers.
+
+From `lgc.c:1543`:
+
+```c
+static void atomic (lua_State *L) {
+  global_State *g = G(L);
+  g->gcstate = GCSatomic;
+  markobject(g, L);  /* mark running thread */
+  markvalue(g, &g->l_registry);
+  markmt(g);  /* mark global metatables */
+  propagateall(g);  /* empties 'gray' list */
+  remarkupvals(g);
+  propagateall(g);
+  convergeephemerons(g);
+  // Clear weak tables, handle finalizers...
+}
+```
+
+### 3. Sweep Phase
+
+Reclaims memory from dead (white) objects and resets live objects to white for the next cycle.
+
+From `lgc.c:892`:
+
+```c
+static GCObject **sweeplist (lua_State *L, GCObject **p, l_mem countin) {
+  global_State *g = G(L);
+  int ow = otherwhite(g);
+  int white = luaC_white(g);  /* current white */
+  while (*p != NULL && countin-- > 0) {
+    GCObject *curr = *p;
+    int marked = curr->marked;
+    if (isdeadm(ow, marked)) {  /* is 'curr' dead? */
+      *p = curr->next;  /* remove 'curr' from list */
+      freeobj(L, curr);  /* erase 'curr' */
+    }
+    else {  /* change mark to 'white' and age to 'new' */
+      curr->marked = cast_byte((marked & ~maskgcbits) | white | G_NEW);
+      p = &curr->next;  /* go to next element */
+    }
+  }
+  return (*p == NULL) ? NULL : p;
+}
+```
+
+<Note>
+The sweep phase processes at most `GCSWEEPMAX` (20) elements per step to maintain incremental behavior.
+</Note>
+
+## Write Barriers
+
+Write barriers maintain the invariant that black objects don't point to white objects.
+
+### Forward Barrier
+
+Marks the white object being assigned (`lgc.c:246`):
+
+```c
+void luaC_barrier_ (lua_State *L, GCObject *o, GCObject *v) {
+  global_State *g = G(L);
+  lua_assert(isblack(o) && iswhite(v) && !isdead(g, v) && !isdead(g, o));
+  if (keepinvariant(g)) {  /* must keep invariant? */
+    reallymarkobject(g, v);  /* restore invariant */
+    if (isold(o)) {
+      lua_assert(!isold(v));  /* white object could not be old */
+      setage(v, G_OLD0);  /* restore generational invariant */
+    }
+  }
+  else {  /* sweep phase */
+    lua_assert(issweepphase(g));
+    if (g->gckind != KGC_GENMINOR)  /* incremental mode? */
+      makewhite(g, o);  /* mark 'o' as white to avoid other barriers */
+  }
+}
+```
+
+### Backward Barrier
+
+Marks the black object as gray again (`lgc.c:268`):
+
+```c
+void luaC_barrierback_ (lua_State *L, GCObject *o) {
+  global_State *g = G(L);
+  lua_assert(isblack(o) && !isdead(g, o));
+  if (getage(o) == G_TOUCHED2)  /* already in gray list? */
+    set2gray(o);
+  else  /* link it in 'grayagain' and paint it gray */
+    linkobjgclist(o, g->grayagain);
+  if (isold(o))  /* generational mode? */
+    setage(o, G_TOUCHED1);  /* touched in current cycle */
+}
+```
+
+## Weak Tables
+
+Weak tables allow keys and/or values to be collected when no other references exist.
+
+### Weak Table Modes
+
+```lua
+-- Weak values: keys are strong, values can be collected
+setmetatable(t, {__mode = "v"})
+
+-- Weak keys: values are strong, keys can be collected  
+setmetatable(t, {__mode = "k"})
+
+-- Fully weak: both keys and values can be collected
+setmetatable(t, {__mode = "kv"})
+```
+
+From `lgc.c:595`:
+
+```c
+static int getmode (global_State *g, Table *h) {
+  const TValue *mode = gfasttm(g, h->metatable, TM_MODE);
+  if (mode == NULL || !ttisstring(mode))
+    return 0;  /* ignore non-string modes */
+  else {
+    const char *smode = getstr(tsvalue(mode));
+    const char *weakkey = strchr(smode, 'k');
+    const char *weakvalue = strchr(smode, 'v');
+    return ((weakkey != NULL) << 1) | (weakvalue != NULL);
+  }
+}
+```
+
+## Ephemeron Tables
+
+Tables with weak keys (`__mode = "k"` or `__mode = "kv"`) are treated as ephemerons: a value is only kept alive if its corresponding key is alive.
+
+## GC Parameters
+
+Key tunable parameters (`lgc.h:173`):
+
+```c
+#define LUAI_GCPAUSE    250   /* Wait 250% growth before starting cycle */
+#define LUAI_GCMUL      200   /* 200% work multiplier */
+#define LUAI_GCSTEPSIZE (200 * sizeof(Table))  /* Step size */
+
+/* Generational mode */
+#define LUAI_MINORMAJOR 70    /* 70% old bytes triggers major */
+#define LUAI_MAJORMINOR 50    /* 50% collected returns to minor */
+#define LUAI_GENMINORMUL 20   /* 20% growth triggers minor */
+```
+
+## Controlling the GC from Lua
+
+```lua
+-- Stop collector
+collectgarbage("stop")
+
+-- Restart collector  
+collectgarbage("restart")
+
+-- Perform full collection
+collectgarbage("collect")
+
+-- Perform incremental step
+collectgarbage("step", size)
+
+-- Get memory usage in KB
+local mem = collectgarbage("count")
+
+-- Set pause parameter (default 200 = 200%)
+collectgarbage("setpause", 150)
+
+-- Set step multiplier (default 200 = 200%)
+collectgarbage("setstepmul", 150)
+
+-- Switch to generational mode
+collectgarbage("generational")
+
+-- Switch to incremental mode  
+collectgarbage("incremental")
+```
+
+## Performance Tuning
+
+<Tip>
+For programs with high allocation rates:
+- Use generational mode
+- Increase `GCPAUSE` to reduce collection frequency
+- Decrease `GCMUL` for more aggressive collection
+</Tip>
+
+<Tip>
+For programs requiring low latency:
+- Use incremental mode
+- Decrease `GCSTEPSIZE` for smaller steps
+- Increase `GCMUL` to complete cycles faster
+</Tip>
+
+## Finalizers
+
+Objects with `__gc` metamethods are finalized before collection:
+
+```lua
+local obj = {}
+setmetatable(obj, {
+  __gc = function(self)
+    print("Object being collected")
+  end
+})
+```
+
+From `lgc.c:968`:
+
+```c
+static void GCTM (lua_State *L) {
+  global_State *g = G(L);
+  const TValue *tm;
+  TValue v;
+  lua_assert(!g->gcemergency);
+  setgcovalue(L, &v, udata2finalize(g));
+  tm = luaT_gettmbyobj(L, &v, TM_GC);
+  if (!notm(tm)) {  /* is there a finalizer? */
+    // Call the finalizer...
+  }
+}
+```
+
+## See Also
+
+- [Memory Management](/advanced/memory-management)
+- [Performance Optimization](/advanced/performance)

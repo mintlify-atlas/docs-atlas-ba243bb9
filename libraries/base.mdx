@@ -1,0 +1,486 @@
+---
+title: "Base Library"
+description: "Core Lua functions available in the global environment"
+---
+
+The base library provides core functionality and is always available without requiring any module loading. These functions are defined in the global environment.
+
+## Output Functions
+
+### print
+
+Prints values to standard output, separated by tabs.
+
+<ParamField path="···" type="any">
+  Values to print (uses `tostring` for conversion)
+</ParamField>
+
+```lua
+print("Hello", "World", 42)
+-- Output: Hello    World    42
+```
+
+### warn
+
+Emits a warning message composed of all string arguments.
+
+<ParamField path="msg1" type="string" required>
+  First part of warning message
+</ParamField>
+
+<ParamField path="···" type="string">
+  Additional message parts
+</ParamField>
+
+```lua
+warn("@on")  -- Turn warnings on
+warn("This is a warning")
+warn("@off") -- Turn warnings off
+```
+
+## Type Conversion
+
+### tonumber
+
+Converts a value to a number.
+
+<ParamField path="v" type="any" required>
+  Value to convert
+</ParamField>
+
+<ParamField path="base" type="integer">
+  Base for conversion (2-36), only for string arguments
+</ParamField>
+
+<ResponseField name="result" type="number | nil">
+  Converted number or nil if conversion failed
+</ResponseField>
+
+```lua
+tonumber("42")        -- 42
+tonumber("1010", 2)   -- 10 (binary)
+tonumber("FF", 16)    -- 255 (hexadecimal)
+tonumber("invalid")   -- nil
+```
+
+### tostring
+
+Converts a value to a string.
+
+<ParamField path="v" type="any" required>
+  Value to convert
+</ParamField>
+
+<ResponseField name="result" type="string">
+  String representation of the value
+</ResponseField>
+
+```lua
+tostring(42)      -- "42"
+tostring(true)    -- "true"
+tostring({})      -- "table: 0x..."
+```
+
+### type
+
+Returns the type of a value as a string.
+
+<ParamField path="v" type="any" required>
+  Value to check
+</ParamField>
+
+<ResponseField name="result" type="string">
+  Type name: "nil", "number", "string", "boolean", "table", "function", "thread", or "userdata"
+</ResponseField>
+
+```lua
+type(42)        -- "number"
+type("hello")   -- "string"
+type({})        -- "table"
+type(print)     -- "function"
+```
+
+## Error Handling
+
+### error
+
+Raises an error with the given message.
+
+<ParamField path="message" type="any" required>
+  Error message
+</ParamField>
+
+<ParamField path="level" type="integer">
+  Stack level for error position (default: 1)
+</ParamField>
+
+```lua
+error("Something went wrong")
+error("Invalid argument", 2)  -- Report error at caller's level
+```
+
+### assert
+
+Raises an error if the value is false or nil.
+
+<ParamField path="v" type="any" required>
+  Value to check
+</ParamField>
+
+<ParamField path="message" type="any">
+  Error message if assertion fails
+</ParamField>
+
+<ResponseField name="···" type="any">
+  All arguments if assertion succeeds
+</ResponseField>
+
+```lua
+assert(x > 0, "x must be positive")
+assert(file, "Failed to open file")
+```
+
+### pcall
+
+Calls a function in protected mode.
+
+<ParamField path="f" type="function" required>
+  Function to call
+</ParamField>
+
+<ParamField path="···" type="any">
+  Arguments to pass to function
+</ParamField>
+
+<ResponseField name="status" type="boolean">
+  True if call succeeded, false if error occurred
+</ResponseField>
+
+<ResponseField name="···" type="any">
+  Return values from function, or error message if failed
+</ResponseField>
+
+```lua
+local ok, result = pcall(function(x) return x * 2 end, 5)
+if ok then
+  print("Result:", result)  -- Result: 10
+else
+  print("Error:", result)
+end
+```
+
+### xpcall
+
+Calls a function with a custom error handler.
+
+<ParamField path="f" type="function" required>
+  Function to call
+</ParamField>
+
+<ParamField path="msgh" type="function" required>
+  Error handler function
+</ParamField>
+
+<ParamField path="···" type="any">
+  Arguments to pass to function
+</ParamField>
+
+```lua
+local function handler(err)
+  return "Error: " .. tostring(err)
+end
+
+local ok, result = xpcall(riskyFunction, handler, arg1, arg2)
+```
+
+## Metatables
+
+### getmetatable
+
+Returns the metatable of an object.
+
+<ParamField path="object" type="any" required>
+  Object to get metatable from
+</ParamField>
+
+<ResponseField name="metatable" type="table | nil">
+  The metatable, or nil if object has no metatable
+</ResponseField>
+
+```lua
+local mt = getmetatable("string")  -- Returns string metatable
+```
+
+### setmetatable
+
+Sets the metatable for a table.
+
+<ParamField path="table" type="table" required>
+  Table to set metatable for
+</ParamField>
+
+<ParamField path="metatable" type="table | nil" required>
+  Metatable to set, or nil to remove
+</ParamField>
+
+<ResponseField name="table" type="table">
+  The original table
+</ResponseField>
+
+```lua
+local t = {}
+local mt = { __index = function(t, k) return "default" end }
+setmetatable(t, mt)
+print(t.anything)  -- "default"
+```
+
+## Raw Operations
+
+### rawget
+
+Gets a table value without invoking metamethods.
+
+<ParamField path="table" type="table" required>
+  Table to index
+</ParamField>
+
+<ParamField path="index" type="any" required>
+  Key to look up
+</ParamField>
+
+```lua
+rawget(t, "key")  -- Get t["key"] without calling __index
+```
+
+### rawset
+
+Sets a table value without invoking metamethods.
+
+<ParamField path="table" type="table" required>
+  Table to modify
+</ParamField>
+
+<ParamField path="index" type="any" required>
+  Key to set
+</ParamField>
+
+<ParamField path="value" type="any" required>
+  Value to set
+</ParamField>
+
+```lua
+rawset(t, "key", "value")  -- Set t["key"] without calling __newindex
+```
+
+### rawequal
+
+Compares two values without invoking metamethods.
+
+<ParamField path="v1" type="any" required>
+  First value
+</ParamField>
+
+<ParamField path="v2" type="any" required>
+  Second value
+</ParamField>
+
+<ResponseField name="equal" type="boolean">
+  True if values are equal
+</ResponseField>
+
+```lua
+rawequal(a, b)  -- Compare without calling __eq
+```
+
+### rawlen
+
+Returns the length of a table or string without invoking metamethods.
+
+<ParamField path="v" type="table | string" required>
+  Table or string to measure
+</ParamField>
+
+<ResponseField name="length" type="integer">
+  The raw length
+</ResponseField>
+
+```lua
+rawlen({1, 2, 3})  -- 3
+rawlen("hello")    -- 5
+```
+
+## Iteration
+
+### next
+
+Returns the next key-value pair from a table.
+
+<ParamField path="table" type="table" required>
+  Table to iterate
+</ParamField>
+
+<ParamField path="index" type="any">
+  Current key (nil to start iteration)
+</ParamField>
+
+<ResponseField name="key" type="any">
+  Next key, or nil if no more entries
+</ResponseField>
+
+<ResponseField name="value" type="any">
+  Value for the key
+</ResponseField>
+
+```lua
+for k, v in next, t do
+  print(k, v)
+end
+```
+
+### pairs
+
+Returns an iterator for key-value pairs.
+
+<ParamField path="t" type="table" required>
+  Table to iterate
+</ParamField>
+
+```lua
+for key, value in pairs(t) do
+  print(key, value)
+end
+```
+
+### ipairs
+
+Returns an iterator for array indices and values.
+
+<ParamField path="t" type="table" required>
+  Table to iterate (as array)
+</ParamField>
+
+```lua
+for i, value in ipairs({10, 20, 30}) do
+  print(i, value)  -- 1 10, 2 20, 3 30
+end
+```
+
+## Loading Code
+
+### load
+
+Loads a chunk from a string or function.
+
+<ParamField path="chunk" type="string | function" required>
+  Lua code or reader function
+</ParamField>
+
+<ParamField path="chunkname" type="string">
+  Name for error messages
+</ParamField>
+
+<ParamField path="mode" type="string">
+  "b" (binary), "t" (text), or "bt" (both)
+</ParamField>
+
+<ParamField path="env" type="table">
+  Environment for the loaded chunk
+</ParamField>
+
+```lua
+local f = load("return 2 + 2")
+print(f())  -- 4
+```
+
+### loadfile
+
+Loads a chunk from a file.
+
+<ParamField path="filename" type="string">
+  File to load (nil for stdin)
+</ParamField>
+
+<ParamField path="mode" type="string">
+  "b" (binary), "t" (text), or "bt" (both)
+</ParamField>
+
+<ParamField path="env" type="table">
+  Environment for the loaded chunk
+</ParamField>
+
+```lua
+local f = loadfile("script.lua")
+if f then
+  f()  -- Execute the loaded file
+end
+```
+
+### dofile
+
+Executes a Lua file.
+
+<ParamField path="filename" type="string">
+  File to execute (nil for stdin)
+</ParamField>
+
+<ResponseField name="···" type="any">
+  Values returned by the file
+</ResponseField>
+
+```lua
+dofile("config.lua")  -- Load and execute
+```
+
+## Utilities
+
+### select
+
+Returns selected arguments.
+
+<ParamField path="index" type="integer | string" required>
+  Index to start from, or "#" for count
+</ParamField>
+
+<ParamField path="···" type="any">
+  Arguments to select from
+</ParamField>
+
+```lua
+select(2, "a", "b", "c")  -- Returns "b", "c"
+select("#", "a", "b", "c")  -- Returns 3
+```
+
+### collectgarbage
+
+Controls the garbage collector.
+
+<ParamField path="opt" type="string">
+  Operation: "collect", "stop", "restart", "count", "step", "isrunning", "incremental", "generational"
+</ParamField>
+
+<ParamField path="···" type="any">
+  Arguments for the operation
+</ParamField>
+
+```lua
+collectgarbage("collect")  -- Run garbage collection
+collectgarbage("count")    -- Get memory usage in KB
+```
+
+## Global Variables
+
+### _G
+
+The global environment table.
+
+```lua
+_G.myGlobal = "value"  -- Same as myGlobal = "value"
+```
+
+### _VERSION
+
+A string containing the running Lua version.
+
+```lua
+print(_VERSION)  -- "Lua 5.4"
+```

@@ -1,0 +1,462 @@
+---
+title: 'Debug Hooks'
+description: 'Hook system for monitoring Lua execution'
+---
+
+## Overview
+
+Lua's hook system allows you to monitor and intercept program execution at specific points. Hooks are called when certain events occur, such as function calls, returns, or line executions. This mechanism is essential for implementing debuggers, profilers, and code coverage tools.
+
+## Hook Types
+
+The `lua_Hook` type defines the signature for hook functions:
+
+```c
+typedef void (*lua_Hook)(lua_State *L, lua_Debug *ar);
+```
+
+<ParamField path="L" type="lua_State*">
+  The Lua state where the event occurred
+</ParamField>
+
+<ParamField path="ar" type="lua_Debug*">
+  Debug structure containing information about the event
+</ParamField>
+
+## Event Codes
+
+Hooks are triggered by specific events, identified by these constants:
+
+### LUA_HOOKCALL
+
+Called when the interpreter calls a function. The hook is called just after Lua enters the new function.
+
+```c
+#define LUA_HOOKCALL 0
+```
+
+### LUA_HOOKRET
+
+Called when the interpreter returns from a function. The hook is called just before Lua leaves the function.
+
+```c
+#define LUA_HOOKRET 1
+```
+
+### LUA_HOOKLINE
+
+Called when the interpreter is about to start the execution of a new line of code, or when it jumps back in the code (even to the same line).
+
+```c
+#define LUA_HOOKLINE 2
+```
+
+### LUA_HOOKCOUNT
+
+Called after the interpreter executes every `count` instructions.
+
+```c
+#define LUA_HOOKCOUNT 3
+```
+
+### LUA_HOOKTAILCALL
+
+Called when the interpreter calls a function in a tail call. In this case, there will be no corresponding return event.
+
+```c
+#define LUA_HOOKTAILCALL 4
+```
+
+## Event Masks
+
+Masks are used to specify which events should trigger the hook:
+
+```c
+#define LUA_MASKCALL  (1 << LUA_HOOKCALL)   // 0x01
+#define LUA_MASKRET   (1 << LUA_HOOKRET)    // 0x02
+#define LUA_MASKLINE  (1 << LUA_HOOKLINE)   // 0x04
+#define LUA_MASKCOUNT (1 << LUA_HOOKCOUNT)  // 0x08
+```
+
+Masks can be combined with bitwise OR:
+
+```c
+int mask = LUA_MASKCALL | LUA_MASKRET | LUA_MASKLINE;
+```
+
+## Core Functions
+
+### lua_sethook
+
+Sets the debugging hook function.
+
+```c
+void lua_sethook(lua_State *L, lua_Hook func, int mask, int count);
+```
+
+<ParamField path="L" type="lua_State*">
+  The Lua state
+</ParamField>
+
+<ParamField path="func" type="lua_Hook">
+  Hook function to install, or NULL to disable hooks
+</ParamField>
+
+<ParamField path="mask" type="int">
+  Bitwise OR of event masks (LUA_MASKCALL, LUA_MASKRET, etc.)
+</ParamField>
+
+<ParamField path="count" type="int">
+  If greater than zero, the hook will be called after every `count` instructions (requires LUA_MASKCOUNT in mask)
+</ParamField>
+
+**Example:**
+
+```c
+void my_hook(lua_State *L, lua_Debug *ar) {
+    lua_getinfo(L, "nSl", ar);
+    
+    switch (ar->event) {
+        case LUA_HOOKCALL:
+            printf("Calling: %s\n", ar->name ? ar->name : "<unknown>");
+            break;
+        case LUA_HOOKRET:
+            printf("Returning from: %s\n", ar->name ? ar->name : "<unknown>");
+            break;
+        case LUA_HOOKLINE:
+            printf("Line: %d in %s\n", ar->currentline, ar->short_src);
+            break;
+    }
+}
+
+// Install hook for calls, returns, and line events
+int mask = LUA_MASKCALL | LUA_MASKRET | LUA_MASKLINE;
+lua_sethook(L, my_hook, mask, 0);
+```
+
+### lua_gethook
+
+Returns the current hook function.
+
+```c
+lua_Hook lua_gethook(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*">
+  The Lua state
+</ParamField>
+
+**Returns:** The current hook function, or NULL if no hook is set.
+
+### lua_gethookmask
+
+Returns the current hook mask.
+
+```c
+int lua_gethookmask(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*">
+  The Lua state
+</ParamField>
+
+**Returns:** The current hook mask (bitwise OR of event masks).
+
+### lua_gethookcount
+
+Returns the current hook count.
+
+```c
+int lua_gethookcount(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*">
+  The Lua state
+</ParamField>
+
+**Returns:** The current hook count value.
+
+## Practical Examples
+
+### Simple Tracer
+
+A basic execution tracer that logs all function calls and returns:
+
+```c
+void trace_hook(lua_State *L, lua_Debug *ar) {
+    if (ar->event == LUA_HOOKCALL || ar->event == LUA_HOOKRET) {
+        lua_getinfo(L, "nSl", ar);
+        
+        const char *event_name = (ar->event == LUA_HOOKCALL) ? "CALL" : "RETURN";
+        const char *func_name = ar->name ? ar->name : "<unknown>";
+        
+        printf("[%s] %s at %s:%d\n", 
+               event_name, func_name, ar->short_src, ar->currentline);
+    }
+}
+
+// Enable tracing
+lua_sethook(L, trace_hook, LUA_MASKCALL | LUA_MASKRET, 0);
+
+// Run some Lua code
+luaL_dostring(L, "function foo() return 42 end; foo()");
+
+// Disable tracing
+lua_sethook(L, NULL, 0, 0);
+```
+
+### Profiler
+
+A simple profiler that counts function calls:
+
+```c
+#include <time.h>
+
+typedef struct {
+    const char *name;
+    int call_count;
+    clock_t total_time;
+    clock_t start_time;
+} ProfileInfo;
+
+#define MAX_FUNCS 1000
+ProfileInfo profile_data[MAX_FUNCS];
+int profile_count = 0;
+
+ProfileInfo *find_or_create_profile(const char *name) {
+    // Find existing
+    for (int i = 0; i < profile_count; i++) {
+        if (strcmp(profile_data[i].name, name) == 0) {
+            return &profile_data[i];
+        }
+    }
+    
+    // Create new
+    if (profile_count < MAX_FUNCS) {
+        ProfileInfo *info = &profile_data[profile_count++];
+        info->name = strdup(name);
+        info->call_count = 0;
+        info->total_time = 0;
+        return info;
+    }
+    
+    return NULL;
+}
+
+void profile_hook(lua_State *L, lua_Debug *ar) {
+    lua_getinfo(L, "n", ar);
+    const char *name = ar->name ? ar->name : "<unknown>";
+    
+    ProfileInfo *info = find_or_create_profile(name);
+    if (!info) return;
+    
+    if (ar->event == LUA_HOOKCALL) {
+        info->call_count++;
+        info->start_time = clock();
+    } else if (ar->event == LUA_HOOKRET) {
+        clock_t elapsed = clock() - info->start_time;
+        info->total_time += elapsed;
+    }
+}
+
+void print_profile_report() {
+    printf("\nProfile Report:\n");
+    printf("%-30s %10s %15s\n", "Function", "Calls", "Total Time (ms)");
+    printf("--------------------------------------------------------\n");
+    
+    for (int i = 0; i < profile_count; i++) {
+        double time_ms = (double)profile_data[i].total_time * 1000.0 / CLOCKS_PER_SEC;
+        printf("%-30s %10d %15.3f\n", 
+               profile_data[i].name, 
+               profile_data[i].call_count,
+               time_ms);
+    }
+}
+
+// Usage:
+lua_sethook(L, profile_hook, LUA_MASKCALL | LUA_MASKRET, 0);
+luaL_dofile(L, "script.lua");
+lua_sethook(L, NULL, 0, 0);
+print_profile_report();
+```
+
+### Line-by-Line Debugger
+
+A simple debugger that allows stepping through code:
+
+```c
+#include <stdio.h>
+#include <string.h>
+
+int stepping = 1;
+int breakpoint_line = -1;
+const char *breakpoint_file = NULL;
+
+void debug_hook(lua_State *L, lua_Debug *ar) {
+    if (ar->event != LUA_HOOKLINE) return;
+    
+    lua_getinfo(L, "Sl", ar);
+    
+    // Check for breakpoint
+    if (breakpoint_line > 0 && ar->currentline == breakpoint_line) {
+        if (!breakpoint_file || strcmp(ar->short_src, breakpoint_file) == 0) {
+            printf("Breakpoint hit at %s:%d\n", ar->short_src, ar->currentline);
+            stepping = 1;
+        }
+    }
+    
+    if (stepping) {
+        printf("\n>>> %s:%d\n", ar->short_src, ar->currentline);
+        printf("Commands: (s)tep, (c)ontinue, (q)uit\n> ");
+        
+        char cmd[10];
+        if (fgets(cmd, sizeof(cmd), stdin)) {
+            switch (cmd[0]) {
+                case 's':
+                    stepping = 1;
+                    break;
+                case 'c':
+                    stepping = 0;
+                    break;
+                case 'q':
+                    exit(0);
+                    break;
+            }
+        }
+    }
+}
+
+// Usage:
+lua_sethook(L, debug_hook, LUA_MASKLINE, 0);
+luaL_dofile(L, "script.lua");
+lua_sethook(L, NULL, 0, 0);
+```
+
+### Instruction Counter
+
+Counts the number of VM instructions executed:
+
+```c
+static long instruction_count = 0;
+
+void count_hook(lua_State *L, lua_Debug *ar) {
+    instruction_count++;
+}
+
+// Count every 100 instructions for better performance
+lua_sethook(L, count_hook, LUA_MASKCOUNT, 100);
+luaL_dostring(L, "for i=1,1000 do end");
+lua_sethook(L, NULL, 0, 0);
+
+printf("Executed approximately %ld instructions\n", instruction_count * 100);
+```
+
+### Code Coverage
+
+Tracks which lines of code have been executed:
+
+```c
+#include <stdlib.h>
+
+typedef struct {
+    char *file;
+    int *lines;  // Bitmap of executed lines
+    int max_line;
+} CoverageInfo;
+
+CoverageInfo *coverage = NULL;
+int coverage_count = 0;
+
+CoverageInfo *get_coverage(const char *file) {
+    for (int i = 0; i < coverage_count; i++) {
+        if (strcmp(coverage[i].file, file) == 0) {
+            return &coverage[i];
+        }
+    }
+    
+    coverage = realloc(coverage, sizeof(CoverageInfo) * (coverage_count + 1));
+    CoverageInfo *info = &coverage[coverage_count++];
+    info->file = strdup(file);
+    info->lines = calloc(10000, sizeof(int));  // Support up to 10000 lines
+    info->max_line = 0;
+    return info;
+}
+
+void coverage_hook(lua_State *L, lua_Debug *ar) {
+    if (ar->event != LUA_HOOKLINE) return;
+    
+    lua_getinfo(L, "Sl", ar);
+    CoverageInfo *info = get_coverage(ar->short_src);
+    
+    if (ar->currentline > 0 && ar->currentline < 10000) {
+        info->lines[ar->currentline] = 1;
+        if (ar->currentline > info->max_line) {
+            info->max_line = ar->currentline;
+        }
+    }
+}
+
+void print_coverage_report() {
+    printf("\nCode Coverage Report:\n");
+    
+    for (int i = 0; i < coverage_count; i++) {
+        CoverageInfo *info = &coverage[i];
+        int executed = 0;
+        
+        for (int line = 1; line <= info->max_line; line++) {
+            if (info->lines[line]) executed++;
+        }
+        
+        printf("\n%s: %d/%d lines (%.1f%%)\n", 
+               info->file, executed, info->max_line,
+               100.0 * executed / info->max_line);
+    }
+}
+
+// Usage:
+lua_sethook(L, coverage_hook, LUA_MASKLINE, 0);
+luaL_dofile(L, "script.lua");
+lua_sethook(L, NULL, 0, 0);
+print_coverage_report();
+```
+
+## Performance Considerations
+
+<Warning>
+  Hooks can significantly impact performance, especially LUA_MASKLINE and LUA_MASKCOUNT. Use them judiciously in production code.
+</Warning>
+
+- **Line hooks** (LUA_MASKLINE) are called for every line executed and have the highest overhead
+- **Count hooks** (LUA_MASKCOUNT) overhead depends on the count value - higher values are more efficient
+- **Call/Return hooks** (LUA_MASKCALL/LUA_MASKRET) have moderate overhead
+- Consider disabling hooks in performance-critical sections
+- Use conditional logic inside hooks to minimize processing time
+
+## Lua API
+
+The debug library (`ldblib.c`) provides Lua-level access to hooks:
+
+```lua
+-- Set a hook from Lua
+debug.sethook(function(event, line)
+    print(event, line)
+end, "clr")  -- 'c' = call, 'l' = line, 'r' = return
+
+-- Get current hook
+local hook, mask, count = debug.gethook()
+
+-- Remove hook
+debug.sethook()
+```
+
+**Mask characters:**
+- `'c'`: calls
+- `'r'`: returns
+- `'l'`: lines
+
+**Count parameter:** If provided, hook is called every N instructions.
+
+## See Also
+
+- [Debug Interface](/api/debug-interface) - Core debug API functions
+- [Auxiliary Library](/api/auxiliary-functions) - Helper functions for common tasks

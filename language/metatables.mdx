@@ -1,0 +1,582 @@
+---
+title: Metatables
+description: Learn how to customize table behavior using Lua's powerful metatable system
+---
+
+## Introduction
+
+Metatables allow you to change the behavior of tables by defining custom operations. They enable operator overloading, property access control, and object-oriented programming patterns.
+
+```lua
+local t = {}
+local mt = {}
+setmetatable(t, mt)
+assert(getmetatable(t) == mt)
+```
+
+## Basic Metatable Operations
+
+### Setting and Getting Metatables
+
+```lua
+local t = {x = 10}
+local mt = {name = "my metatable"}
+
+-- Set metatable
+setmetatable(t, mt)
+
+-- Get metatable
+local retrieved = getmetatable(t)
+assert(retrieved == mt)
+assert(retrieved.name == "my metatable")
+
+-- Remove metatable
+setmetatable(t, nil)
+assert(getmetatable(t) == nil)
+```
+
+### Protected Metatables
+
+```lua
+local t = {name = "Alice"}
+local mt = {
+  __metatable = "This metatable is protected"
+}
+setmetatable(t, mt)
+
+-- getmetatable returns __metatable value
+assert(getmetatable(t) == "This metatable is protected")
+
+-- Cannot change protected metatable
+local success = pcall(setmetatable, t, {})
+assert(success == false)
+```
+
+## Metamethods
+
+Metamethods are special keys in metatables that define custom behavior:
+
+### __index (Property Access)
+
+Called when accessing a missing key:
+
+<Tabs>
+<Tab title="Function">
+```lua
+local defaults = {color = "blue", size = 10}
+local mt = {
+  __index = function(table, key)
+    print("Looking for key:", key)
+    return defaults[key]
+  end
+}
+
+local t = {}
+setmetatable(t, mt)
+
+assert(t.color == "blue")  -- Calls __index
+assert(t.size == 10)        -- Calls __index
+```
+</Tab>
+
+<Tab title="Table">
+```lua
+-- __index can be a table
+local defaults = {color = "blue", size = 10}
+local mt = {__index = defaults}
+
+local t = {}
+setmetatable(t, mt)
+
+assert(t.color == "blue")
+assert(t.size == 10)
+```
+</Tab>
+
+<Tab title="Chained Lookup">
+```lua
+-- Chain multiple __index tables
+local level3 = {z = 3}
+local level2 = {y = 2}
+local level1 = {x = 1}
+
+setmetatable(level2, {__index = level3})
+setmetatable(level1, {__index = level2})
+
+local t = {}
+setmetatable(t, {__index = level1})
+
+assert(t.x == 1)
+assert(t.y == 2)
+assert(t.z == 3)
+```
+</Tab>
+</Tabs>
+
+### __newindex (Property Assignment)
+
+Called when setting a new key:
+
+```lua
+local storage = {}
+local mt = {
+  __newindex = function(table, key, value)
+    print("Setting", key, "=", value)
+    storage[key] = value  -- Store in separate table
+  end,
+  __index = storage
+}
+
+local t = {}
+setmetatable(t, mt)
+
+t.name = "Alice"  -- Calls __newindex
+assert(t.name == "Alice")  -- Calls __index
+assert(rawget(t, "name") == nil)  -- Not in t itself
+```
+
+<Note>
+`__newindex` is only called when the key doesn't exist in the table. Use `rawset()` to bypass it.
+</Note>
+
+### Arithmetic Metamethods
+
+<CodeGroup>
+```lua Addition (__add)
+local mt = {
+  __add = function(a, b)
+    return {x = a.x + b.x, y = a.y + b.y}
+  end
+}
+
+local v1 = setmetatable({x = 1, y = 2}, mt)
+local v2 = setmetatable({x = 3, y = 4}, mt)
+local v3 = v1 + v2
+
+assert(v3.x == 4 and v3.y == 6)
+```
+
+```lua Other Operations
+local mt = {
+  __sub = function(a, b) return a.x - b.x end,
+  __mul = function(a, b) return a.x * b.x end,
+  __div = function(a, b) return a.x / b.x end,
+  __idiv = function(a, b) return a.x // b.x end,
+  __mod = function(a, b) return a.x % b.x end,
+  __pow = function(a, b) return a.x ^ b.x end,
+  __unm = function(a) return -a.x end
+}
+
+local a = setmetatable({x = 10}, mt)
+local b = setmetatable({x = 3}, mt)
+
+assert(a + b == 13)
+assert(a - b == 7)
+assert(a * b == 30)
+assert(-a == -10)
+```
+</CodeGroup>
+
+### Comparison Metamethods
+
+```lua
+local mt = {
+  __eq = function(a, b)
+    return a.x == b.x
+  end,
+  __lt = function(a, b)
+    return a.x < b.x
+  end,
+  __le = function(a, b)
+    return a.x <= b.x
+  end
+}
+
+local a = setmetatable({x = 10}, mt)
+local b = setmetatable({x = 20}, mt)
+local c = setmetatable({x = 10}, mt)
+
+assert(a == c)     -- Uses __eq
+assert(a < b)      -- Uses __lt
+assert(a <= b)     -- Uses __le
+assert(b > a)      -- Derived from __lt
+assert(a ~= b)     -- Negation of __eq
+```
+
+### Bitwise Metamethods (Lua 5.3+)
+
+```lua
+local mt = {
+  __band = function(a, b) return a.x & b.x end,
+  __bor = function(a, b) return a.x | b.x end,
+  __bxor = function(a, b) return a.x ~ b.x end,
+  __bnot = function(a) return ~a.x end,
+  __shl = function(a, b) return a.x << b end,
+  __shr = function(a, b) return a.x >> b end
+}
+
+local a = setmetatable({x = 0xF0}, mt)
+local b = setmetatable({x = 0xCC}, mt)
+
+assert(a & b == (0xF0 & 0xCC))
+assert(a | b == (0xF0 | 0xCC))
+assert(~a == ~0xF0)
+```
+
+### __concat (Concatenation)
+
+```lua
+local mt = {
+  __concat = function(a, b)
+    local function getValue(x)
+      return type(x) == "table" and x.value or x
+    end
+    local result = getValue(a) .. getValue(b)
+    return setmetatable({value = result}, mt)
+  end
+}
+
+local a = setmetatable({value = "Hello"}, mt)
+local b = setmetatable({value = "World"}, mt)
+
+local c = a .. " " .. b
+assert(c.value == "Hello World")
+```
+
+### __len (Length Operator)
+
+```lua
+local mt = {
+  __len = function(t)
+    return t.size
+  end
+}
+
+local t = setmetatable({size = 100}, mt)
+assert(#t == 100)
+
+-- Note: rawlen gets actual table length
+local arr = {1, 2, 3, 4, 5}
+setmetatable(arr, {__len = function() return 100 end})
+assert(#arr == 100)      -- Uses __len
+assert(rawlen(arr) == 5) -- Bypasses __len
+```
+
+### __call (Function Calls)
+
+Make tables callable like functions:
+
+```lua
+local mt = {
+  __call = function(t, ...)
+    local args = {...}
+    print("Called with", #args, "arguments")
+    return t.value + args[1]
+  end
+}
+
+local t = setmetatable({value = 10}, mt)
+local result = t(5)  -- Calls __call
+assert(result == 15)
+```
+
+### __tostring (String Conversion)
+
+```lua
+local mt = {
+  __tostring = function(t)
+    return string.format("Point(%d, %d)", t.x, t.y)
+  end
+}
+
+local point = setmetatable({x = 10, y = 20}, mt)
+assert(tostring(point) == "Point(10, 20)")
+print(point)  -- Automatically uses __tostring
+```
+
+## Advanced Patterns
+
+### Read-Only Tables
+
+```lua
+local function readOnly(table)
+  local mt = {
+    __index = table,
+    __newindex = function(t, key, value)
+      error("Attempt to modify read-only table")
+    end
+  }
+  return setmetatable({}, mt)
+end
+
+local config = readOnly({version = "1.0", name = "MyApp"})
+assert(config.version == "1.0")
+-- config.version = "2.0"  -- Error!
+```
+
+### Default Values
+
+```lua
+local function withDefaults(table, defaults)
+  return setmetatable(table, {__index = defaults})
+end
+
+local defaults = {color = "blue", size = 10}
+local obj = withDefaults({color = "red"}, defaults)
+
+assert(obj.color == "red")  -- From obj
+assert(obj.size == 10)      -- From defaults
+```
+
+### Property Tracking
+
+```lua
+local function tracked(table)
+  local accesses = {}
+  local mt = {
+    __index = function(t, key)
+      accesses[key] = (accesses[key] or 0) + 1
+      return rawget(t, key)
+    end
+  }
+  setmetatable(table, mt)
+  table._accesses = accesses
+  return table
+end
+
+local t = tracked({x = 10, y = 20})
+local a = t.x
+local b = t.x
+local c = t.y
+
+assert(t._accesses.x == 2)
+assert(t._accesses.y == 1)
+```
+
+### Weak Tables
+
+Weakly referenced keys or values for garbage collection:
+
+<Tabs>
+<Tab title="Weak Values">
+```lua
+-- Values can be garbage collected
+local cache = {}
+setmetatable(cache, {__mode = "v"})
+
+local obj = {data = "important"}
+cache.key = obj
+
+assert(cache.key ~= nil)
+obj = nil  -- Remove strong reference
+collectgarbage()
+-- cache.key may now be nil (was collected)
+```
+</Tab>
+
+<Tab title="Weak Keys">
+```lua
+-- Keys can be garbage collected
+local registry = {}
+setmetatable(registry, {__mode = "k"})
+
+local key = {}
+registry[key] = "value"
+
+assert(registry[key] == "value")
+key = nil  -- Remove strong reference
+collectgarbage()
+-- Entry may now be removed from registry
+```
+</Tab>
+
+<Tab title="Weak Both">
+```lua
+-- Both keys and values are weak
+local ephemeral = {}
+setmetatable(ephemeral, {__mode = "kv"})
+
+local key = {}
+local value = {}
+ephemeral[key] = value
+
+key = nil
+value = nil
+collectgarbage()
+-- Entry removed when both are collected
+```
+</Tab>
+</Tabs>
+
+### Object-Oriented Programming
+
+Implement classes using metatables:
+
+```lua
+-- Define a class
+local Dog = {}
+Dog.__index = Dog
+
+function Dog.new(name, age)
+  local self = setmetatable({}, Dog)
+  self.name = name
+  self.age = age
+  return self
+end
+
+function Dog:bark()
+  return self.name .. " says Woof!"
+end
+
+function Dog:birthday()
+  self.age = self.age + 1
+end
+
+-- Create instances
+local fido = Dog.new("Fido", 3)
+local rex = Dog.new("Rex", 5)
+
+assert(fido:bark() == "Fido says Woof!")
+fido:birthday()
+assert(fido.age == 4)
+```
+
+### Inheritance
+
+```lua
+-- Base class
+local Animal = {}
+Animal.__index = Animal
+
+function Animal.new(name)
+  return setmetatable({name = name}, Animal)
+end
+
+function Animal:speak()
+  return self.name .. " makes a sound"
+end
+
+-- Derived class
+local Cat = setmetatable({}, {__index = Animal})
+Cat.__index = Cat
+
+function Cat.new(name, color)
+  local self = Animal.new(name)
+  setmetatable(self, Cat)
+  self.color = color
+  return self
+end
+
+function Cat:speak()  -- Override
+  return self.name .. " says Meow!"
+end
+
+function Cat:purr()
+  return self.name .. " is purring"
+end
+
+local whiskers = Cat.new("Whiskers", "orange")
+assert(whiskers:speak() == "Whiskers says Meow!")
+assert(whiskers:purr() == "Whiskers is purring")
+```
+
+## Metamethods for Basic Types
+
+Set metatables for numbers, strings, and other basic types:
+
+```lua
+local debug = require("debug")
+
+-- Metatable for numbers
+local mt = {
+  __index = function(n, k)
+    if k == "double" then
+      return n * 2
+    end
+  end
+}
+debug.setmetatable(0, mt)
+
+assert((5).double == 10)
+assert((10).double == 20)
+
+-- Clean up
+debug.setmetatable(0, nil)
+```
+
+<Warning>
+Setting metatables for basic types affects **all** values of that type globally. Use with caution!
+</Warning>
+
+## Raw Functions
+
+Bypass metamethods with raw operations:
+
+```lua
+local t = setmetatable({x = 10}, {
+  __index = function() return 999 end,
+  __newindex = function() error("read-only") end
+})
+
+-- Regular operations use metamethods
+assert(t.y == 999)  -- __index called
+
+-- Raw operations bypass metamethods
+assert(rawget(t, "y") == nil)
+assert(rawget(t, "x") == 10)
+
+rawset(t, "y", 20)  -- No error
+assert(rawget(t, "y") == 20)
+
+-- rawequal for equality without __eq
+local a = setmetatable({}, {__eq = function() return true end})
+local b = {}
+assert(a == b)              -- Uses __eq (returns true)
+assert(not rawequal(a, b))  -- Bypasses __eq (returns false)
+```
+
+## Performance Considerations
+
+<Note>
+**Metatable Performance Tips:**
+
+1. Metamethod calls have overhead - avoid in tight loops
+2. Cache metamethod functions when possible
+3. Use `rawget`/`rawset` to bypass metamethods when needed
+4. `__index` table is faster than `__index` function
+5. Keep metatables simple for better performance
+</Note>
+
+```lua
+-- Faster: __index as table
+local mt1 = {__index = {x = 10, y = 20}}
+
+-- Slower: __index as function
+local mt2 = {
+  __index = function(t, k)
+    if k == "x" then return 10
+    elseif k == "y" then return 20
+    end
+  end
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Tables" icon="table" href="./tables">
+Review table fundamentals
+</Card>
+
+<Card title="Functions" icon="function" href="./functions">
+Learn about closures and higher-order functions
+</Card>
+
+<Card title="Modules" icon="box" href="./modules">
+Organize code with modules
+</Card>
+
+<Card title="Coroutines" icon="arrows-spin" href="./coroutines">
+Implement cooperative multitasking
+</Card>
+</CardGroup>

@@ -1,0 +1,242 @@
+---
+title: Stack Manipulation
+description: Functions for manipulating the Lua stack
+---
+
+## Overview
+
+Lua uses a virtual stack to pass values to and from C. The stack manipulation functions allow you to access and modify this stack.
+
+## Functions
+
+### lua_absindex
+
+Converts the acceptable index `idx` into an equivalent absolute index.
+
+```c
+int lua_absindex(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index to convert
+</ParamField>
+
+**Returns:** The absolute index.
+
+**Example:**
+
+```c
+// If the stack has 5 elements, index -1 is the top
+int abs_idx = lua_absindex(L, -1);
+// abs_idx will be 5
+```
+
+### lua_gettop
+
+Returns the index of the top element in the stack.
+
+```c
+int lua_gettop(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+**Returns:** The index of the top element (which equals the number of elements in the stack).
+
+**Example:**
+
+```c
+int top = lua_gettop(L);
+printf("Stack has %d elements\n", top);
+```
+
+### lua_settop
+
+Accepts any index, or 0, and sets the stack top to this index.
+
+```c
+void lua_settop(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The new top index. Use 0 to empty the stack.
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+// Pop 2 elements from the stack
+lua_settop(L, -3);
+
+// Empty the stack
+lua_settop(L, 0);
+
+// Ensure stack has exactly 5 elements
+lua_settop(L, 5);
+```
+
+### lua_pushvalue
+
+Pushes a copy of the element at the given index onto the stack.
+
+```c
+void lua_pushvalue(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The index of the element to copy
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+// Duplicate the top element
+lua_pushvalue(L, -1);
+
+// Push a copy of the element at index 3
+lua_pushvalue(L, 3);
+```
+
+### lua_rotate
+
+Rotates the stack elements between the valid index `idx` and the top of the stack.
+
+```c
+void lua_rotate(lua_State *L, int idx, int n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The index where rotation starts
+</ParamField>
+
+<ParamField path="n" type="int" required>
+  Number of positions to rotate (positive for up, negative for down)
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+// Stack: a b c d e (e is top)
+lua_rotate(L, 1, 2);
+// Stack: d e a b c (c is top)
+
+// To insert an element at position 3:
+lua_rotate(L, 3, 1);
+```
+
+### lua_copy
+
+Copies the element at index `fromidx` into the valid index `toidx`, replacing the value at that position.
+
+```c
+void lua_copy(lua_State *L, int fromidx, int toidx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="fromidx" type="int" required>
+  The source index
+</ParamField>
+
+<ParamField path="toidx" type="int" required>
+  The destination index
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+// Copy the top element to index 3
+lua_copy(L, -1, 3);
+```
+
+### lua_checkstack
+
+Ensures that the stack has space for at least `n` extra elements.
+
+```c
+int lua_checkstack(lua_State *L, int n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="n" type="int" required>
+  Number of extra stack slots needed
+</ParamField>
+
+**Returns:** True (non-zero) if successful, false (zero) if it cannot grow the stack to that size.
+
+**Example:**
+
+```c
+if (!lua_checkstack(L, 10)) {
+    fprintf(stderr, "Cannot grow stack\n");
+    return -1;
+}
+// Now we can safely push up to 10 more elements
+```
+
+### lua_xmove
+
+Exchange values between different threads of the same state.
+
+```c
+void lua_xmove(lua_State *from, lua_State *to, int n);
+```
+
+<ParamField path="from" type="lua_State*" required>
+  The source thread
+</ParamField>
+
+<ParamField path="to" type="lua_State*" required>
+  The destination thread
+</ParamField>
+
+<ParamField path="n" type="int" required>
+  Number of values to move
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+lua_State *thread1 = lua_newthread(L);
+lua_State *thread2 = lua_newthread(L);
+
+// Push some values on thread1
+lua_pushinteger(thread1, 42);
+lua_pushstring(thread1, "hello");
+
+// Move them to thread2
+lua_xmove(thread1, thread2, 2);
+```

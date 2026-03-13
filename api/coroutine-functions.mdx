@@ -1,0 +1,296 @@
+---
+title: Coroutine Functions
+description: Functions for managing Lua coroutines
+---
+
+## Overview
+
+These functions allow you to work with Lua coroutines (cooperative multithreading) from C.
+
+## Functions
+
+### lua_yield
+
+Yields a coroutine.
+
+```c
+int lua_yield(lua_State *L, int nresults);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state (coroutine)
+</ParamField>
+
+<ParamField path="nresults" type="int" required>
+  Number of values on the stack to return as yield results
+</ParamField>
+
+**Returns:** Never returns normally. When the coroutine is resumed, execution continues after this call.
+
+**Example:**
+
+```c
+int my_yielding_function(lua_State *L) {
+    int n = lua_tointeger(L, 1);
+    
+    for (int i = 0; i < n; i++) {
+        lua_pushinteger(L, i);
+        lua_yield(L, 1);  // Yield with one result
+        // Execution resumes here after resume
+    }
+    
+    return 0;
+}
+```
+
+### lua_yieldk
+
+Yields a coroutine with continuation support.
+
+```c
+int lua_yieldk(lua_State *L, int nresults, lua_KContext ctx, lua_KFunction k);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="nresults" type="int" required>
+  Number of values to yield
+</ParamField>
+
+<ParamField path="ctx" type="lua_KContext" required>
+  Context value passed to continuation function
+</ParamField>
+
+<ParamField path="k" type="lua_KFunction" required>
+  Continuation function called when coroutine resumes
+</ParamField>
+
+**Returns:** Never returns (or returns through continuation).
+
+**Example:**
+
+```c
+int continuation(lua_State *L, int status, lua_KContext ctx) {
+    int count = (int)ctx;
+    printf("Resumed with count: %d\n", count);
+    
+    if (count > 0) {
+        lua_pushinteger(L, count);
+        return lua_yieldk(L, 1, count - 1, continuation);
+    }
+    
+    return 0;
+}
+
+int yielding_with_continuation(lua_State *L) {
+    int n = lua_tointeger(L, 1);
+    lua_pushinteger(L, n);
+    return lua_yieldk(L, 1, n - 1, continuation);
+}
+```
+
+### lua_resume
+
+Starts or resumes a coroutine.
+
+```c
+int lua_resume(lua_State *L, lua_State *from, int narg, int *nres);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The coroutine to resume
+</ParamField>
+
+<ParamField path="from" type="lua_State*">
+  The coroutine that is resuming L, or `NULL` if called from the main thread
+</ParamField>
+
+<ParamField path="narg" type="int" required>
+  Number of arguments on the stack to pass to the coroutine
+</ParamField>
+
+<ParamField path="nres" type="int*" required>
+  Pointer to store the number of results returned
+</ParamField>
+
+**Returns:** `LUA_OK` if coroutine finishes, `LUA_YIELD` if it yields, or an error code.
+
+**Example:**
+
+```c
+void run_coroutine(lua_State *L) {
+    // Create a new thread/coroutine
+    lua_State *co = lua_newthread(L);
+    
+    // Load function into coroutine
+    lua_getglobal(co, "my_coroutine");
+    
+    // Resume coroutine with no arguments
+    int nres;
+    int status = lua_resume(co, L, 0, &nres);
+    
+    while (status == LUA_YIELD) {
+        printf("Coroutine yielded %d results\n", nres);
+        
+        // Process yielded values
+        for (int i = 0; i < nres; i++) {
+            if (lua_isinteger(co, -nres + i)) {
+                printf("  Result %d: %lld\n", i, lua_tointeger(co, -nres + i));
+            }
+        }
+        
+        // Pop yielded values
+        lua_pop(co, nres);
+        
+        // Resume again
+        status = lua_resume(co, L, 0, &nres);
+    }
+    
+    if (status == LUA_OK) {
+        printf("Coroutine finished with %d results\n", nres);
+    } else {
+        fprintf(stderr, "Coroutine error: %s\n", lua_tostring(co, -1));
+    }
+}
+```
+
+### lua_status
+
+Returns the status of a coroutine.
+
+```c
+int lua_status(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state (coroutine)
+</ParamField>
+
+**Returns:** `LUA_OK` for normal threads, `LUA_YIELD` for suspended coroutines, or an error status.
+
+**Example:**
+
+```c
+int status = lua_status(co);
+switch (status) {
+    case LUA_OK:
+        printf("Coroutine is running or finished\n");
+        break;
+    case LUA_YIELD:
+        printf("Coroutine is suspended\n");
+        break;
+    case LUA_ERRRUN:
+        printf("Coroutine had a runtime error\n");
+        break;
+}
+```
+
+### lua_isyieldable
+
+Returns 1 if the given coroutine can yield.
+
+```c
+int lua_isyieldable(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+**Returns:** 1 if the coroutine can yield, 0 otherwise.
+
+**Example:**
+
+```c
+int my_function(lua_State *L) {
+    if (lua_isyieldable(L)) {
+        printf("Can yield from here\n");
+        lua_pushinteger(L, 42);
+        return lua_yield(L, 1);
+    } else {
+        printf("Cannot yield (running in main thread or C call)\n");
+        return 0;
+    }
+}
+```
+
+## Complete Example
+
+```c
+// Generator coroutine that yields numbers
+int number_generator(lua_State *L) {
+    int max = luaL_checkinteger(L, 1);
+    
+    for (int i = 1; i <= max; i++) {
+        lua_pushinteger(L, i);
+        lua_yield(L, 1);
+    }
+    
+    return 0;  // Coroutine finished
+}
+
+// Use the generator from C
+void use_generator(lua_State *L) {
+    // Create coroutine
+    lua_State *co = lua_newthread(L);
+    int co_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+    
+    // Push generator function and argument
+    lua_pushcfunction(co, number_generator);
+    lua_pushinteger(co, 5);
+    
+    // Start coroutine
+    int nres;
+    int status = lua_resume(co, L, 1, &nres);
+    
+    // Iterate through yielded values
+    while (status == LUA_YIELD) {
+        printf("Generated: %lld\n", lua_tointeger(co, -1));
+        lua_pop(co, 1);
+        
+        // Resume for next value
+        status = lua_resume(co, L, 0, &nres);
+    }
+    
+    if (status == LUA_OK) {
+        printf("Generator finished\n");
+    } else {
+        fprintf(stderr, "Error: %s\n", lua_tostring(co, -1));
+    }
+    
+    // Clean up
+    luaL_unref(L, LUA_REGISTRYINDEX, co_ref);
+}
+```
+
+## Producer-Consumer Example
+
+```c
+// Producer coroutine
+int producer(lua_State *L) {
+    for (int i = 1; i <= 10; i++) {
+        lua_pushfstring(L, "item_%d", i);
+        lua_yield(L, 1);
+    }
+    return 0;
+}
+
+// Consumer in C
+void consumer(lua_State *L) {
+    lua_State *prod = lua_newthread(L);
+    lua_pushcfunction(prod, producer);
+    
+    int nres;
+    int status = lua_resume(prod, L, 0, &nres);
+    
+    while (status == LUA_YIELD) {
+        const char *item = lua_tostring(prod, -1);
+        printf("Consumed: %s\n", item);
+        lua_pop(prod, 1);
+        
+        status = lua_resume(prod, L, 0, &nres);
+    }
+}
+```

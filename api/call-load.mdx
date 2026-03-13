@@ -1,0 +1,324 @@
+---
+title: Call and Load Functions
+description: Functions for calling Lua functions and loading Lua code
+---
+
+## Overview
+
+These functions allow you to call Lua functions from C and load Lua code (chunks) from various sources.
+
+## Calling Functions
+
+### lua_call
+
+Calls a function in unprotected mode.
+
+```c
+void lua_call(lua_State *L, int nargs, int nresults);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="nargs" type="int" required>
+  Number of arguments pushed onto the stack
+</ParamField>
+
+<ParamField path="nresults" type="int" required>
+  Number of results expected, or `LUA_MULTRET` for all results
+</ParamField>
+
+**Returns:** Nothing. Results are pushed onto the stack.
+
+**Example:**
+
+```c
+lua_getglobal(L, "print");        // Stack: print
+lua_pushstring(L, "Hello");       // Stack: print, "Hello"
+lua_call(L, 1, 0);                // Call print("Hello"), no results
+
+lua_getglobal(L, "math");         // Stack: math
+lua_getfield(L, -1, "sin");       // Stack: math, sin
+lua_pushnumber(L, 3.14159/2);     // Stack: math, sin, 1.5708
+lua_call(L, 1, 1);                // Stack: math, result
+double result = lua_tonumber(L, -1);
+```
+
+### lua_callk
+
+Calls a function in unprotected mode with continuation support.
+
+```c
+void lua_callk(lua_State *L, int nargs, int nresults,
+               lua_KContext ctx, lua_KFunction k);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="nargs" type="int" required>
+  Number of arguments
+</ParamField>
+
+<ParamField path="nresults" type="int" required>
+  Number of results
+</ParamField>
+
+<ParamField path="ctx" type="lua_KContext" required>
+  Context value to pass to continuation function
+</ParamField>
+
+<ParamField path="k" type="lua_KFunction">
+  Continuation function to call after yielding
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+int continuation(lua_State *L, int status, lua_KContext ctx) {
+    // Handle results after yield
+    return 0;
+}
+
+lua_getglobal(L, "coroutine_func");
+lua_callk(L, 0, 0, 0, continuation);
+```
+
+### lua_pcall
+
+Calls a function in protected mode.
+
+```c
+int lua_pcall(lua_State *L, int nargs, int nresults, int errfunc);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="nargs" type="int" required>
+  Number of arguments
+</ParamField>
+
+<ParamField path="nresults" type="int" required>
+  Number of results, or `LUA_MULTRET`
+</ParamField>
+
+<ParamField path="errfunc" type="int" required>
+  Stack index of error handler function, or 0 for none
+</ParamField>
+
+**Returns:** `LUA_OK` (0) on success, or an error code: `LUA_ERRRUN`, `LUA_ERRMEM`, `LUA_ERRERR`.
+
+**Example:**
+
+```c
+lua_getglobal(L, "risky_function");
+lua_pushstring(L, "arg1");
+lua_pushinteger(L, 42);
+
+if (lua_pcall(L, 2, 1, 0) != LUA_OK) {
+    const char *err = lua_tostring(L, -1);
+    fprintf(stderr, "Error: %s\n", err);
+    lua_pop(L, 1);
+    return -1;
+}
+
+// Success - result is on stack
+int result = lua_tointeger(L, -1);
+lua_pop(L, 1);
+```
+
+### lua_pcallk
+
+Calls a function in protected mode with continuation support.
+
+```c
+int lua_pcallk(lua_State *L, int nargs, int nresults, int errfunc,
+               lua_KContext ctx, lua_KFunction k);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="nargs" type="int" required>
+  Number of arguments
+</ParamField>
+
+<ParamField path="nresults" type="int" required>
+  Number of results
+</ParamField>
+
+<ParamField path="errfunc" type="int" required>
+  Stack index of error handler
+</ParamField>
+
+<ParamField path="ctx" type="lua_KContext" required>
+  Context for continuation
+</ParamField>
+
+<ParamField path="k" type="lua_KFunction">
+  Continuation function
+</ParamField>
+
+**Returns:** Error status code.
+
+## Loading Code
+
+### lua_load
+
+Loads a Lua chunk without running it.
+
+```c
+int lua_load(lua_State *L, lua_Reader reader, void *data,
+             const char *chunkname, const char *mode);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="reader" type="lua_Reader" required>
+  Reader function to provide the chunk data
+</ParamField>
+
+<ParamField path="data" type="void*" required>
+  Opaque value passed to the reader
+</ParamField>
+
+<ParamField path="chunkname" type="const char*" required>
+  Name for error messages and debug info
+</ParamField>
+
+<ParamField path="mode" type="const char*">
+  "b" (binary), "t" (text), or "bt" (both). `NULL` defaults to "bt"
+</ParamField>
+
+**Returns:** `LUA_OK` on success, or an error code.
+
+**Example:**
+
+```c
+typedef struct {
+    const char *code;
+    size_t size;
+    int read;
+} ReaderData;
+
+const char *string_reader(lua_State *L, void *data, size_t *size) {
+    ReaderData *rd = (ReaderData *)data;
+    if (rd->read) {
+        return NULL;  // Already read
+    }
+    rd->read = 1;
+    *size = rd->size;
+    return rd->code;
+}
+
+void load_string(lua_State *L, const char *code) {
+    ReaderData rd = {code, strlen(code), 0};
+    
+    if (lua_load(L, string_reader, &rd, "mycode", "t") != LUA_OK) {
+        fprintf(stderr, "Load error: %s\n", lua_tostring(L, -1));
+        lua_pop(L, 1);
+        return;
+    }
+    
+    // Chunk is now on stack as a function
+    if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+        fprintf(stderr, "Execution error: %s\n", lua_tostring(L, -1));
+        lua_pop(L, 1);
+    }
+}
+```
+
+### lua_dump
+
+Dumps a function as a binary chunk.
+
+```c
+int lua_dump(lua_State *L, lua_Writer writer, void *data, int strip);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="writer" type="lua_Writer" required>
+  Writer function to receive the chunk data
+</ParamField>
+
+<ParamField path="data" type="void*" required>
+  Opaque value passed to the writer
+</ParamField>
+
+<ParamField path="strip" type="int" required>
+  1 to strip debug information, 0 to keep it
+</ParamField>
+
+**Returns:** 0 on success, non-zero on error (from writer).
+
+**Example:**
+
+```c
+typedef struct {
+    FILE *fp;
+} WriterData;
+
+int file_writer(lua_State *L, const void *p, size_t sz, void *ud) {
+    WriterData *wd = (WriterData *)ud;
+    return (fwrite(p, 1, sz, wd->fp) != sz);
+}
+
+void dump_function(lua_State *L, const char *filename) {
+    WriterData wd;
+    wd.fp = fopen(filename, "wb");
+    if (!wd.fp) {
+        fprintf(stderr, "Cannot open file\n");
+        return;
+    }
+    
+    // Function must be on top of stack
+    if (lua_dump(L, file_writer, &wd, 1) != 0) {
+        fprintf(stderr, "Dump failed\n");
+    }
+    
+    fclose(wd.fp);
+}
+```
+
+## Complete Example
+
+```c
+// Call a Lua function safely and get result
+int call_lua_add(lua_State *L, int a, int b, int *result) {
+    lua_getglobal(L, "add");  // Get function
+    if (!lua_isfunction(L, -1)) {
+        lua_pop(L, 1);
+        return -1;
+    }
+    
+    lua_pushinteger(L, a);
+    lua_pushinteger(L, b);
+    
+    if (lua_pcall(L, 2, 1, 0) != LUA_OK) {
+        fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+        lua_pop(L, 1);
+        return -1;
+    }
+    
+    if (!lua_isinteger(L, -1)) {
+        lua_pop(L, 1);
+        return -1;
+    }
+    
+    *result = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+    return 0;
+}
+```

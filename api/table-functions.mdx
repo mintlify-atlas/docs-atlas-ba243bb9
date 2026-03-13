@@ -1,0 +1,425 @@
+---
+title: 'Table Functions'
+description: 'Table manipulation and array operations'
+---
+
+The table library provides functions for manipulating tables, particularly arrays. All functions are in the `table` table.
+
+## Array Operations
+
+<Accordion title="table.insert">
+Inserts an element into a table.
+
+```lua
+table.insert(list, [pos,] value)
+```
+
+**Parameters:**
+- `list` - The table
+- `pos` - Optional position (default: end)
+- `value` - Value to insert
+
+**Example:**
+```lua
+local fruits = {"apple", "banana"}
+table.insert(fruits, "cherry")
+print(table.concat(fruits, ", "))  -- "apple, banana, cherry"
+
+table.insert(fruits, 2, "blueberry")
+print(table.concat(fruits, ", "))
+-- "apple, blueberry, banana, cherry"
+```
+</Accordion>
+
+<Accordion title="table.remove">
+Removes an element from a table.
+
+```lua
+table.remove(list [, pos])
+```
+
+**Parameters:**
+- `list` - The table
+- `pos` - Position to remove (default: last)
+
+**Returns:** Removed element
+
+**Example:**
+```lua
+local numbers = {10, 20, 30, 40, 50}
+local removed = table.remove(numbers)  -- Remove last
+print(removed)  -- 50
+print(table.concat(numbers, ", "))  -- "10, 20, 30, 40"
+
+removed = table.remove(numbers, 2)  -- Remove at position 2
+print(removed)  -- 20
+print(table.concat(numbers, ", "))  -- "10, 30, 40"
+```
+</Accordion>
+
+<Accordion title="table.move">
+Moves elements from one table to another (or within the same table).
+
+```lua
+table.move(a1, f, e, t [, a2])
+```
+
+**Parameters:**
+- `a1` - Source table
+- `f` - Start index
+- `e` - End index
+- `t` - Destination index
+- `a2` - Destination table (default: a1)
+
+**Returns:** Destination table
+
+**Example:**
+```lua
+-- Copy within same table
+local t = {10, 20, 30, 40, 50}
+table.move(t, 1, 3, 4)  -- Copy first 3 to position 4
+print(table.concat(t, ", "))  -- "10, 20, 30, 10, 20, 30"
+
+-- Copy to another table
+local src = {"a", "b", "c"}
+local dst = {"x", "y", "z"}
+table.move(src, 1, 3, 2, dst)
+print(table.concat(dst, ", "))  -- "x, a, b, c"
+```
+</Accordion>
+
+<Accordion title="table.concat">
+Concatenates array elements into a string.
+
+```lua
+table.concat(list [, sep [, i [, j]]])
+```
+
+**Parameters:**
+- `list` - The table
+- `sep` - Separator (default: empty string)
+- `i` - Start index (default: 1)
+- `j` - End index (default: #list)
+
+**Returns:** Concatenated string
+
+**Example:**
+```lua
+local words = {"Hello", "World", "from", "Lua"}
+print(table.concat(words))  -- "HelloWorldfromLua"
+print(table.concat(words, " "))  -- "Hello World from Lua"
+print(table.concat(words, "-"))  -- "Hello-World-from-Lua"
+print(table.concat(words, ", ", 2, 3))  -- "World, from"
+
+-- Building CSV
+local data = {"John", "30", "Engineer"}
+local csv = table.concat(data, ",")
+print(csv)  -- "John,30,Engineer"
+```
+</Accordion>
+
+## Sorting
+
+<Accordion title="table.sort">
+Sorts array elements in place.
+
+```lua
+table.sort(list [, comp])
+```
+
+**Parameters:**
+- `list` - The table to sort
+- `comp` - Optional comparison function
+
+**Example:**
+```lua
+-- Simple sort
+local numbers = {5, 2, 8, 1, 9}
+table.sort(numbers)
+print(table.concat(numbers, ", "))  -- "1, 2, 5, 8, 9"
+
+-- Reverse sort
+local numbers = {5, 2, 8, 1, 9}
+table.sort(numbers, function(a, b) return a > b end)
+print(table.concat(numbers, ", "))  -- "9, 8, 5, 2, 1"
+
+-- Sort by property
+local people = {
+  {name = "Alice", age = 30},
+  {name = "Bob", age = 25},
+  {name = "Charlie", age = 35}
+}
+
+table.sort(people, function(a, b)
+  return a.age < b.age
+end)
+
+for _, person in ipairs(people) do
+  print(person.name, person.age)
+end
+-- Bob    25
+-- Alice  30
+-- Charlie 35
+
+-- Sort strings case-insensitive
+local words = {"Zebra", "apple", "Banana"}
+table.sort(words, function(a, b)
+  return string.lower(a) < string.lower(b)
+end)
+print(table.concat(words, ", "))  -- "apple, Banana, Zebra"
+```
+</Accordion>
+
+## Packing and Unpacking
+
+<Accordion title="table.pack">
+Packs values into a table with a `n` field.
+
+```lua
+table.pack(...)
+```
+
+**Returns:** Table with `n` field indicating count
+
+**Example:**
+```lua
+function varargs(...)
+  local args = table.pack(...)
+  print("Received", args.n, "arguments")
+  for i = 1, args.n do
+    print(i, args[i])
+  end
+end
+
+varargs(10, 20, nil, 40)
+-- Received 4 arguments
+-- 1  10
+-- 2  20
+-- 3  nil
+-- 4  40
+```
+</Accordion>
+
+<Accordion title="table.unpack">
+Unpacks table elements as separate values.
+
+```lua
+table.unpack(list [, i [, j]])
+```
+
+**Parameters:**
+- `list` - The table
+- `i` - Start index (default: 1)
+- `j` - End index (default: #list)
+
+**Returns:** Individual values
+
+**Example:**
+```lua
+local t = {10, 20, 30, 40}
+local a, b, c, d = table.unpack(t)
+print(a, b, c, d)  -- 10  20  30  40
+
+-- Partial unpack
+local x, y = table.unpack(t, 2, 3)
+print(x, y)  -- 20  30
+
+-- Pass table as function arguments
+function sum(a, b, c)
+  return a + b + c
+end
+
+local numbers = {5, 10, 15}
+print(sum(table.unpack(numbers)))  -- 30
+```
+</Accordion>
+
+## Table Creation
+
+<Accordion title="table.create">
+Creates a table with pre-allocated space.
+
+```lua
+table.create(narray [, nhash])
+```
+
+**Parameters:**
+- `narray` - Array part size
+- `nhash` - Hash part size (optional)
+
+**Returns:** New table
+
+**Example:**
+```lua
+-- Pre-allocate for 100 array elements
+local t = table.create(100)
+for i = 1, 100 do
+  t[i] = i * 2
+end
+
+-- Pre-allocate for both array and hash parts
+local t = table.create(10, 5)
+```
+</Accordion>
+
+## Practical Examples
+
+### Stack Implementation
+
+```lua
+local Stack = {}
+Stack.__index = Stack
+
+function Stack.new()
+  return setmetatable({}, Stack)
+end
+
+function Stack:push(value)
+  table.insert(self, value)
+end
+
+function Stack:pop()
+  return table.remove(self)
+end
+
+function Stack:peek()
+  return self[#self]
+end
+
+function Stack:isEmpty()
+  return #self == 0
+end
+
+-- Usage
+local stack = Stack.new()
+stack:push(10)
+stack:push(20)
+stack:push(30)
+print(stack:pop())  -- 30
+print(stack:peek()) -- 20
+```
+
+### Queue Implementation
+
+```lua
+local Queue = {}
+Queue.__index = Queue
+
+function Queue.new()
+  return setmetatable({}, Queue)
+end
+
+function Queue:enqueue(value)
+  table.insert(self, value)
+end
+
+function Queue:dequeue()
+  return table.remove(self, 1)
+end
+
+function Queue:peek()
+  return self[1]
+end
+
+function Queue:isEmpty()
+  return #self == 0
+end
+
+-- Usage
+local queue = Queue.new()
+queue:enqueue("first")
+queue:enqueue("second")
+queue:enqueue("third")
+print(queue:dequeue())  -- "first"
+print(queue:peek())     -- "second"
+```
+
+### Array Utilities
+
+```lua
+-- Filter array
+function filter(arr, predicate)
+  local result = {}
+  for _, value in ipairs(arr) do
+    if predicate(value) then
+      table.insert(result, value)
+    end
+  end
+  return result
+end
+
+local numbers = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+local evens = filter(numbers, function(n) return n % 2 == 0 end)
+print(table.concat(evens, ", "))  -- "2, 4, 6, 8, 10"
+
+-- Map array
+function map(arr, transform)
+  local result = {}
+  for _, value in ipairs(arr) do
+    table.insert(result, transform(value))
+  end
+  return result
+end
+
+local numbers = {1, 2, 3, 4, 5}
+local squared = map(numbers, function(n) return n * n end)
+print(table.concat(squared, ", "))  -- "1, 4, 9, 16, 25"
+
+-- Reduce array
+function reduce(arr, fn, initial)
+  local accumulator = initial
+  for _, value in ipairs(arr) do
+    accumulator = fn(accumulator, value)
+  end
+  return accumulator
+end
+
+local numbers = {1, 2, 3, 4, 5}
+local sum = reduce(numbers, function(acc, n) return acc + n end, 0)
+print(sum)  -- 15
+
+-- Remove duplicates
+function unique(arr)
+  local seen = {}
+  local result = {}
+  for _, value in ipairs(arr) do
+    if not seen[value] then
+      seen[value] = true
+      table.insert(result, value)
+    end
+  end
+  return result
+end
+
+local numbers = {1, 2, 2, 3, 3, 3, 4, 5, 5}
+local distinct = unique(numbers)
+print(table.concat(distinct, ", "))  -- "1, 2, 3, 4, 5"
+```
+
+### CSV Parser
+
+```lua
+function parseCSV(text)
+  local rows = {}
+  for line in text:gmatch("[^\n]+") do
+    local row = {}
+    for field in line:gmatch("[^,]+") do
+      table.insert(row, field:match("^%s*(.-)%s*$"))
+    end
+    table.insert(rows, row)
+  end
+  return rows
+end
+
+local csv = [[
+Name,Age,City
+Alice,30,NYC
+Bob,25,LA
+Charlie,35,Chicago
+]]
+
+local data = parseCSV(csv)
+for i, row in ipairs(data) do
+  print(table.concat(row, " | "))
+end
+```

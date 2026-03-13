@@ -1,0 +1,560 @@
+---
+title: 'Math Functions'
+description: 'Mathematical operations and constants'
+---
+
+The math library provides standard mathematical functions and constants. All functions are in the `math` table.
+
+## Trigonometric Functions
+
+<Accordion title="math.sin">
+Returns the sine of x (in radians).
+
+```lua
+math.sin(x)
+```
+
+**Example:**
+```lua
+print(math.sin(0))             -- 0.0
+print(math.sin(math.pi / 2))   -- 1.0
+print(math.sin(math.pi))       -- ~0.0
+```
+</Accordion>
+
+<Accordion title="math.cos">
+Returns the cosine of x (in radians).
+
+```lua
+math.cos(x)
+```
+
+**Example:**
+```lua
+print(math.cos(0))             -- 1.0
+print(math.cos(math.pi / 2))   -- ~0.0
+print(math.cos(math.pi))       -- -1.0
+```
+</Accordion>
+
+<Accordion title="math.tan">
+Returns the tangent of x (in radians).
+
+```lua
+math.tan(x)
+```
+
+**Example:**
+```lua
+print(math.tan(0))             -- 0.0
+print(math.tan(math.pi / 4))   -- ~1.0
+```
+</Accordion>
+
+<Accordion title="math.asin">
+Returns the arc sine of x (in radians).
+
+```lua
+math.asin(x)
+```
+
+**Parameters:**
+- `x` - Value between -1 and 1
+
+**Example:**
+```lua
+print(math.asin(0))     -- 0.0
+print(math.asin(1))     -- ~1.571 (π/2)
+print(math.asin(0.5))   -- ~0.524
+```
+</Accordion>
+
+<Accordion title="math.acos">
+Returns the arc cosine of x (in radians).
+
+```lua
+math.acos(x)
+```
+
+**Example:**
+```lua
+print(math.acos(1))     -- 0.0
+print(math.acos(0))     -- ~1.571 (π/2)
+print(math.acos(-1))    -- ~3.142 (π)
+```
+</Accordion>
+
+<Accordion title="math.atan">
+Returns the arc tangent of y/x (in radians).
+
+```lua
+math.atan(y [, x])
+```
+
+**Example:**
+```lua
+print(math.atan(0))      -- 0.0
+print(math.atan(1))      -- ~0.785 (π/4)
+print(math.atan(1, 1))   -- ~0.785 (π/4)
+print(math.atan(1, 0))   -- ~1.571 (π/2)
+```
+</Accordion>
+
+## Angle Conversion
+
+<Accordion title="math.deg">
+Converts radians to degrees.
+
+```lua
+math.deg(x)
+```
+
+**Example:**
+```lua
+print(math.deg(math.pi))      -- 180.0
+print(math.deg(math.pi / 2))  -- 90.0
+print(math.deg(0))            -- 0.0
+```
+</Accordion>
+
+<Accordion title="math.rad">
+Converts degrees to radians.
+
+```lua
+math.rad(x)
+```
+
+**Example:**
+```lua
+print(math.rad(180))  -- ~3.142 (π)
+print(math.rad(90))   -- ~1.571 (π/2)
+print(math.rad(0))    -- 0.0
+```
+</Accordion>
+
+## Rounding and Absolute Value
+
+<Accordion title="math.floor">
+Returns the largest integer less than or equal to x.
+
+```lua
+math.floor(x)
+```
+
+**Example:**
+```lua
+print(math.floor(3.7))   -- 3
+print(math.floor(3.2))   -- 3
+print(math.floor(-3.2))  -- -4
+print(math.floor(-3.7))  -- -4
+```
+</Accordion>
+
+<Accordion title="math.ceil">
+Returns the smallest integer greater than or equal to x.
+
+```lua
+math.ceil(x)
+```
+
+**Example:**
+```lua
+print(math.ceil(3.2))   -- 4
+print(math.ceil(3.7))   -- 4
+print(math.ceil(-3.7))  -- -3
+print(math.ceil(-3.2))  -- -3
+```
+</Accordion>
+
+<Accordion title="math.abs">
+Returns the absolute value of x.
+
+```lua
+math.abs(x)
+```
+
+**Example:**
+```lua
+print(math.abs(5))    -- 5
+print(math.abs(-5))   -- 5
+print(math.abs(0))    -- 0
+print(math.abs(-3.5)) -- 3.5
+```
+</Accordion>
+
+<Accordion title="math.modf">
+Returns the integer and fractional parts of x.
+
+```lua
+math.modf(x)
+```
+
+**Returns:** integer part, fractional part
+
+**Example:**
+```lua
+local int, frac = math.modf(3.75)
+print(int, frac)   -- 3  0.75
+
+int, frac = math.modf(-3.75)
+print(int, frac)   -- -3  -0.75
+```
+</Accordion>
+
+## Exponential and Logarithmic
+
+<Accordion title="math.exp">
+Returns e^x.
+
+```lua
+math.exp(x)
+```
+
+**Example:**
+```lua
+print(math.exp(0))    -- 1.0
+print(math.exp(1))    -- ~2.718 (e)
+print(math.exp(2))    -- ~7.389
+```
+</Accordion>
+
+<Accordion title="math.log">
+Returns the natural logarithm of x, or log base b of x.
+
+```lua
+math.log(x [, base])
+```
+
+**Example:**
+```lua
+print(math.log(1))        -- 0.0
+print(math.log(math.exp(1)))  -- 1.0
+print(math.log(10))       -- ~2.303
+print(math.log(100, 10))  -- 2.0
+print(math.log(8, 2))     -- 3.0
+```
+</Accordion>
+
+<Accordion title="math.sqrt">
+Returns the square root of x.
+
+```lua
+math.sqrt(x)
+```
+
+**Example:**
+```lua
+print(math.sqrt(4))    -- 2.0
+print(math.sqrt(9))    -- 3.0
+print(math.sqrt(2))    -- ~1.414
+print(math.sqrt(0))    -- 0.0
+```
+</Accordion>
+
+## Power and Modulo
+
+<Accordion title="math.fmod">
+Returns the remainder of x / y.
+
+```lua
+math.fmod(x, y)
+```
+
+**Example:**
+```lua
+print(math.fmod(7, 3))     -- 1.0
+print(math.fmod(10, 3))    -- 1.0
+print(math.fmod(-7, 3))    -- -1.0
+print(math.fmod(7.5, 2))   -- 1.5
+```
+</Accordion>
+
+<Accordion title="math.frexp">
+Returns mantissa and exponent of x.
+
+```lua
+math.frexp(x)
+```
+
+**Returns:** m, e such that x = m * 2^e
+
+**Example:**
+```lua
+local m, e = math.frexp(8)
+print(m, e)  -- 0.5  4 (because 0.5 * 2^4 = 8)
+
+m, e = math.frexp(100)
+print(m, e)  -- 0.78125  7
+```
+</Accordion>
+
+<Accordion title="math.ldexp">
+Returns m * 2^e.
+
+```lua
+math.ldexp(m, e)
+```
+
+**Example:**
+```lua
+print(math.ldexp(0.5, 4))   -- 8.0
+print(math.ldexp(1, 10))    -- 1024.0
+```
+</Accordion>
+
+## Min and Max
+
+<Accordion title="math.min">
+Returns the minimum value among arguments.
+
+```lua
+math.min(x, ...)
+```
+
+**Example:**
+```lua
+print(math.min(5, 3, 8, 1))     -- 1
+print(math.min(10, 20))         -- 10
+print(math.min(-5, -2, -10))    -- -10
+```
+</Accordion>
+
+<Accordion title="math.max">
+Returns the maximum value among arguments.
+
+```lua
+math.max(x, ...)
+```
+
+**Example:**
+```lua
+print(math.max(5, 3, 8, 1))     -- 8
+print(math.max(10, 20))         -- 20
+print(math.max(-5, -2, -10))    -- -2
+```
+</Accordion>
+
+## Type Checking and Conversion
+
+<Accordion title="math.type">
+Returns "integer" or "float", or nil if not a number.
+
+```lua
+math.type(x)
+```
+
+**Example:**
+```lua
+print(math.type(5))       -- "integer"
+print(math.type(5.0))     -- "float"
+print(math.type(5.5))     -- "float"
+print(math.type("5"))     -- nil
+```
+</Accordion>
+
+<Accordion title="math.tointeger">
+Converts x to an integer, returns nil if not possible.
+
+```lua
+math.tointeger(x)
+```
+
+**Example:**
+```lua
+print(math.tointeger(5.0))    -- 5
+print(math.tointeger(5.7))    -- nil
+print(math.tointeger("5"))    -- nil
+print(math.tointeger(5))      -- 5
+```
+</Accordion>
+
+<Accordion title="math.ult">
+Compares as unsigned integers.
+
+```lua
+math.ult(m, n)
+```
+
+**Returns:** true if m < n when compared as unsigned
+
+**Example:**
+```lua
+print(math.ult(2, 3))    -- true
+print(math.ult(3, 2))    -- false
+```
+</Accordion>
+
+## Random Numbers
+
+<Accordion title="math.random">
+Generates pseudo-random numbers.
+
+```lua
+math.random([m [, n]])
+```
+
+**Variations:**
+- `math.random()` - Returns float in [0, 1)
+- `math.random(n)` - Returns integer in [1, n]
+- `math.random(m, n)` - Returns integer in [m, n]
+
+**Example:**
+```lua
+-- Random float
+print(math.random())  -- 0.435234...
+
+-- Random integer 1-10
+print(math.random(10))  -- 7
+
+-- Random integer in range
+print(math.random(50, 100))  -- 73
+
+-- Dice roll
+local roll = math.random(1, 6)
+print("You rolled:", roll)
+
+-- Random choice
+local choices = {"rock", "paper", "scissors"}
+local choice = choices[math.random(#choices)]
+print(choice)
+```
+</Accordion>
+
+<Accordion title="math.randomseed">
+Sets the seed for the random number generator.
+
+```lua
+math.randomseed([x [, y]])
+```
+
+**Example:**
+```lua
+-- Set seed with current time
+math.randomseed(os.time())
+
+-- Reproducible random sequence
+math.randomseed(12345)
+print(math.random())  -- Always same sequence
+
+-- Two-part seed
+math.randomseed(12345, 67890)
+```
+</Accordion>
+
+## Constants
+
+<Accordion title="math.pi">
+The value of π.
+
+```lua
+math.pi
+```
+
+**Example:**
+```lua
+print(math.pi)  -- 3.1415926535898
+
+-- Circle area
+local radius = 5
+local area = math.pi * radius^2
+print(area)  -- 78.539816339745
+
+-- Circle circumference
+local circumference = 2 * math.pi * radius
+print(circumference)  -- 31.415926535898
+```
+</Accordion>
+
+<Accordion title="math.huge">
+The value representing infinity.
+
+```lua
+math.huge
+```
+
+**Example:**
+```lua
+print(math.huge)       -- inf
+print(-math.huge)      -- -inf
+print(1 / 0)          -- inf
+print(math.huge > 1e308)  -- true
+```
+</Accordion>
+
+<Accordion title="math.maxinteger">
+The maximum integer value.
+
+```lua
+math.maxinteger
+```
+
+**Example:**
+```lua
+print(math.maxinteger)  -- 9223372036854775807 (on 64-bit)
+```
+</Accordion>
+
+<Accordion title="math.mininteger">
+The minimum integer value.
+
+```lua
+math.mininteger
+```
+
+**Example:**
+```lua
+print(math.mininteger)  -- -9223372036854775808 (on 64-bit)
+```
+</Accordion>
+
+## Practical Examples
+
+### Distance Between Points
+
+```lua
+function distance(x1, y1, x2, y2)
+  local dx = x2 - x1
+  local dy = y2 - y1
+  return math.sqrt(dx^2 + dy^2)
+end
+
+print(distance(0, 0, 3, 4))  -- 5.0
+print(distance(1, 1, 4, 5))  -- 5.0
+```
+
+### Angle Between Points
+
+```lua
+function angleBetween(x1, y1, x2, y2)
+  local dx = x2 - x1
+  local dy = y2 - y1
+  return math.atan(dy, dx)
+end
+
+local angle = angleBetween(0, 0, 1, 1)
+print(math.deg(angle))  -- 45.0
+```
+
+### Clamping Values
+
+```lua
+function clamp(value, min, max)
+  return math.max(min, math.min(max, value))
+end
+
+print(clamp(5, 1, 10))    -- 5
+print(clamp(-5, 1, 10))   -- 1
+print(clamp(15, 1, 10))   -- 10
+```
+
+### Linear Interpolation
+
+```lua
+function lerp(a, b, t)
+  return a + (b - a) * t
+end
+
+print(lerp(0, 10, 0.5))   -- 5.0
+print(lerp(0, 10, 0.25))  -- 2.5
+print(lerp(0, 10, 1))     -- 10.0
+```

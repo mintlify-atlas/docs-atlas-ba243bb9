@@ -1,0 +1,541 @@
+---
+title: 'Debug Functions'
+description: 'Debugging and introspection functions for Lua programs'
+---
+
+The debug library provides functions for debugging and introspecting Lua programs. These functions should be used carefully as they can affect performance and program behavior.
+
+## Stack Introspection
+
+<Accordion title="debug.getinfo">
+Gets information about a function or stack level.
+
+```lua
+debug.getinfo([thread,] f [, what])
+```
+
+**What options:** `"n"` (name), `"S"` (source), `"l"` (line), `"t"` (tail call), `"u"` (upvalues), `"f"` (function), `"L"` (lines)
+
+**Returns:** Table with function information
+
+**Example:**
+```lua
+function example()
+  local info = debug.getinfo(1)
+  print("Function:", info.name)
+  print("Source:", info.source)
+  print("Line:", info.currentline)
+  print("What:", info.what)
+end
+
+example()
+
+-- Get info about a function
+local info = debug.getinfo(print)
+print(info.name)       -- "print"
+print(info.what)       -- "C"
+print(info.nparams)    -- number of parameters
+print(info.isvararg)   -- true/false
+```
+</Accordion>
+
+<Accordion title="debug.getlocal">
+Gets the value of a local variable.
+
+```lua
+debug.getlocal([thread,] level, local)
+```
+
+**Returns:** Name, value
+
+**Example:**
+```lua
+function showLocals()
+  local x = 10
+  local y = 20
+  local z = 30
+  
+  local i = 1
+  while true do
+    local name, value = debug.getlocal(1, i)
+    if not name then break end
+    print(name, value)
+    i = i + 1
+  end
+end
+
+showLocals()
+-- x  10
+-- y  20
+-- z  30
+```
+</Accordion>
+
+<Accordion title="debug.setlocal">
+Sets the value of a local variable.
+
+```lua
+debug.setlocal([thread,] level, local, value)
+```
+
+**Returns:** Name or nil
+
+**Example:**
+```lua
+function modifyLocal()
+  local x = 10
+  print("Before:", x)
+  
+  debug.setlocal(1, 1, 99)  -- Set first local to 99
+  print("After:", x)
+end
+
+modifyLocal()
+-- Before: 10
+-- After:  99
+```
+</Accordion>
+
+## Upvalue Access
+
+<Accordion title="debug.getupvalue">
+Gets an upvalue from a function.
+
+```lua
+debug.getupvalue(f, up)
+```
+
+**Returns:** Name, value
+
+**Example:**
+```lua
+function makeCounter()
+  local count = 0
+  return function()
+    count = count + 1
+    return count
+  end
+end
+
+local counter = makeCounter()
+counter()  -- 1
+counter()  -- 2
+
+local name, value = debug.getupvalue(counter, 1)
+print(name, value)  -- "count"  2
+```
+</Accordion>
+
+<Accordion title="debug.setupvalue">
+Sets an upvalue of a function.
+
+```lua
+debug.setupvalue(f, up, value)
+```
+
+**Example:**
+```lua
+local counter = makeCounter()
+counter()  -- 1
+
+-- Reset counter
+debug.setupvalue(counter, 1, 0)
+print(counter())  -- 1 (reset)
+```
+</Accordion>
+
+<Accordion title="debug.upvalueid">
+Gets a unique identifier for an upvalue.
+
+```lua
+debug.upvalueid(f, n)
+```
+
+**Example:**
+```lua
+local id = debug.upvalueid(counter, 1)
+print(id)  -- userdata representing the upvalue
+```
+</Accordion>
+
+<Accordion title="debug.upvaluejoin">
+Makes two closures share an upvalue.
+
+```lua
+debug.upvaluejoin(f1, n1, f2, n2)
+```
+
+**Example:**
+```lua
+function makeShared()
+  local shared = 0
+  local f1 = function() shared = shared + 1; return shared end
+  local f2 = function() shared = shared + 10; return shared end
+  return f1, f2
+end
+
+local f1, f2 = makeShared()
+print(f1())  -- 1
+print(f2())  -- 11
+```
+</Accordion>
+
+## Metatables
+
+<Accordion title="debug.getmetatable">
+Gets the metatable of an object.
+
+```lua
+debug.getmetatable(value)
+```
+
+**Example:**
+```lua
+local t = {}
+local mt = {__index = function() return 42 end}
+setmetatable(t, mt)
+
+local meta = debug.getmetatable(t)
+print(meta == mt)  -- true
+
+-- Works on any type
+print(debug.getmetatable(""))  -- string metatable
+print(debug.getmetatable(42))  -- number metatable (or nil)
+```
+</Accordion>
+
+<Accordion title="debug.setmetatable">
+Sets the metatable of an object.
+
+```lua
+debug.setmetatable(value, table)
+```
+
+**Example:**
+```lua
+local t = {}
+local mt = {__index = {x = 10}}
+debug.setmetatable(t, mt)
+print(t.x)  -- 10
+
+-- Can set metatable on any type
+debug.setmetatable("", {__index = {upper = string.upper}})
+```
+</Accordion>
+
+## Registry and Environment
+
+<Accordion title="debug.getregistry">
+Gets the registry table.
+
+```lua
+debug.getregistry()
+```
+
+**Example:**
+```lua
+local registry = debug.getregistry()
+for k, v in pairs(registry) do
+  print(k, type(v))
+end
+```
+</Accordion>
+
+<Accordion title="debug.getuservalue">
+Gets a user value associated with userdata.
+
+```lua
+debug.getuservalue(u, n)
+```
+
+**Returns:** Value, true/false
+
+**Example:**
+```lua
+-- Typically used with C userdata
+local value, exists = debug.getuservalue(userdata, 1)
+if exists then
+  print("User value:", value)
+end
+```
+</Accordion>
+
+<Accordion title="debug.setuservalue">
+Sets a user value for userdata.
+
+```lua
+debug.setuservalue(udata, value, n)
+```
+</Accordion>
+
+## Hooks
+
+<Accordion title="debug.sethook">
+Sets a debug hook function.
+
+```lua
+debug.sethook([thread,] hook, mask [, count])
+```
+
+**Mask:** `"c"` (call), `"r"` (return), `"l"` (line), `"c"` (count)
+
+**Example:**
+```lua
+-- Line hook
+local function lineHook(event, line)
+  print("Line:", line)
+end
+
+debug.sethook(lineHook, "l")
+
+for i = 1, 3 do
+  print(i)
+end
+
+debug.sethook()  -- Disable hook
+
+-- Call/return hook
+local depth = 0
+local function callHook(event)
+  if event == "call" then
+    depth = depth + 1
+    print(string.rep("  ", depth-1) .. "CALL")
+  elseif event == "return" then
+    print(string.rep("  ", depth-1) .. "RETURN")
+    depth = depth - 1
+  end
+end
+
+debug.sethook(callHook, "cr")
+
+function a()
+  function b()
+    print("In b")
+  end
+  b()
+end
+
+a()
+debug.sethook()  -- Disable
+```
+</Accordion>
+
+<Accordion title="debug.gethook">
+Gets the current hook settings.
+
+```lua
+debug.gethook([thread])
+```
+
+**Returns:** hook, mask, count
+
+**Example:**
+```lua
+local hook, mask, count = debug.gethook()
+if hook then
+  print("Hook is set with mask:", mask)
+end
+```
+</Accordion>
+
+## Stack Traces
+
+<Accordion title="debug.traceback">
+Generates a traceback string.
+
+```lua
+debug.traceback([thread,] [message [, level]])
+```
+
+**Example:**
+```lua
+function deepFunction()
+  print(debug.traceback())
+end
+
+function middleFunction()
+  deepFunction()
+end
+
+function topFunction()
+  middleFunction()
+end
+
+topFunction()
+
+-- Custom error with traceback
+function myError(msg)
+  error(debug.traceback(msg, 2))
+end
+```
+</Accordion>
+
+## Interactive Debugging
+
+<Accordion title="debug.debug">
+Enters interactive debug mode.
+
+```lua
+debug.debug()
+```
+
+**Example:**
+```lua
+function problematicFunction()
+  local x = 10
+  local y = 20
+  debug.debug()  -- Enter debug mode
+  return x + y
+end
+
+-- In debug mode, you can:
+-- - Inspect variables
+-- - Execute Lua code
+-- - Type 'cont' to continue
+```
+</Accordion>
+
+## Practical Examples
+
+### Function Profiler
+
+```lua
+local Profiler = {}
+Profiler.stats = {}
+
+function Profiler.start()
+  Profiler.stats = {}
+  
+  local function hook(event)
+    if event == "call" then
+      local info = debug.getinfo(2, "nS")
+      local name = info.name or info.source
+      Profiler.stats[name] = (Profiler.stats[name] or 0) + 1
+    end
+  end
+  
+  debug.sethook(hook, "c")
+end
+
+function Profiler.stop()
+  debug.sethook()
+end
+
+function Profiler.report()
+  print("\nFunction Call Counts:")
+  local sorted = {}
+  for name, count in pairs(Profiler.stats) do
+    table.insert(sorted, {name = name, count = count})
+  end
+  table.sort(sorted, function(a, b) return a.count > b.count end)
+  
+  for _, item in ipairs(sorted) do
+    print(string.format("%5d  %s", item.count, item.name))
+  end
+end
+
+-- Usage
+Profiler.start()
+-- ... run your code ...
+Profiler.stop()
+Profiler.report()
+```
+
+### Variable Inspector
+
+```lua
+function inspect(level)
+  level = level or 2
+  print("\n=== Local Variables ===")
+  
+  local i = 1
+  while true do
+    local name, value = debug.getlocal(level, i)
+    if not name then break end
+    print(string.format("  %s = %s", name, tostring(value)))
+    i = i + 1
+  end
+  
+  print("\n=== Stack Trace ===")
+  print(debug.traceback("", level))
+end
+
+function buggyFunction()
+  local x = 10
+  local y = 20
+  local z = nil
+  
+  inspect()
+  
+  return x / z  -- Error: attempt to divide by nil
+end
+```
+
+### Coverage Tracker
+
+```lua
+local Coverage = {}
+Coverage.lines = {}
+
+function Coverage.start()
+  Coverage.lines = {}
+  
+  local function hook(event, line)
+    local info = debug.getinfo(2, "S")
+    local source = info.source
+    
+    Coverage.lines[source] = Coverage.lines[source] or {}
+    Coverage.lines[source][line] = true
+  end
+  
+  debug.sethook(hook, "l")
+end
+
+function Coverage.stop()
+  debug.sethook()
+end
+
+function Coverage.report()
+  for source, lines in pairs(Coverage.lines) do
+    print("\nFile:", source)
+    local lineNums = {}
+    for line in pairs(lines) do
+      table.insert(lineNums, line)
+    end
+    table.sort(lineNums)
+    print("  Lines executed:", table.concat(lineNums, ", "))
+  end
+end
+```
+
+### Stack Walker
+
+```lua
+function walkStack()
+  print("\n=== Stack Walk ===")
+  local level = 0
+  
+  while true do
+    local info = debug.getinfo(level, "nSlf")
+    if not info then break end
+    
+    print(string.format("\nLevel %d:", level))
+    print("  Function:", info.name or "(anonymous)")
+    print("  Source:", info.short_src)
+    print("  Line:", info.currentline)
+    print("  What:", info.what)
+    
+    -- Show locals
+    print("  Locals:")
+    local i = 1
+    while true do
+      local name, value = debug.getlocal(level, i)
+      if not name then break end
+      print(string.format("    %s = %s", name, tostring(value)))
+      i = i + 1
+    end
+    
+    level = level + 1
+  end
+end
+```

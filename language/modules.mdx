@@ -1,0 +1,559 @@
+---
+title: Modules
+description: Learn how to organize and structure Lua code using modules and packages
+---
+
+## Introduction
+
+Modules provide a way to organize Lua code into reusable components. They help avoid global namespace pollution and enable code reuse across projects.
+
+```lua
+-- Using a module
+local math = require("math")
+local result = math.sqrt(16)
+assert(result == 4)
+```
+
+## Creating Modules
+
+### Basic Module Pattern
+
+Create a table and return it:
+
+```lua
+-- mymodule.lua
+local M = {}
+
+M.version = "1.0"
+
+function M.greet(name)
+  return "Hello, " .. name
+end
+
+function M.add(a, b)
+  return a + b
+end
+
+return M
+```
+
+### Using the Module
+
+```lua
+local mymodule = require("mymodule")
+
+print(mymodule.greet("Alice"))  -- Hello, Alice
+assert(mymodule.add(5, 3) == 8)
+print(mymodule.version)          -- 1.0
+```
+
+### Module with Private Functions
+
+```lua
+-- calculator.lua
+local M = {}
+
+-- Private helper function
+local function validate(x)
+  if type(x) ~= "number" then
+    error("Expected number, got " .. type(x))
+  end
+end
+
+-- Public functions
+function M.square(x)
+  validate(x)
+  return x * x
+end
+
+function M.cube(x)
+  validate(x)
+  return x * x * x
+end
+
+return M
+```
+
+<Note>
+Local functions defined in a module are private and cannot be accessed from outside the module.
+</Note>
+
+## The require() Function
+
+### How require() Works
+
+```lua
+-- First call loads and caches the module
+local mod1 = require("mymodule")
+
+-- Second call returns cached version
+local mod2 = require("mymodule")
+
+assert(mod1 == mod2)  -- Same table!
+```
+
+### Module Search Path
+
+Lua searches for modules using `package.path`:
+
+```lua
+print(package.path)
+-- Output (example):
+-- ./?.lua;/usr/local/share/lua/5.4/?.lua;/usr/local/share/lua/5.4/?/init.lua
+
+-- Add custom search paths
+package.path = package.path .. ";/my/modules/?.lua"
+```
+
+### C Modules
+
+For binary modules, use `package.cpath`:
+
+```lua
+print(package.cpath)
+-- ./?.so;/usr/local/lib/lua/5.4/?.so
+
+-- Load C module
+local cmodule = require("mycmodule")
+```
+
+## Module Patterns
+
+### Simple Table Return
+
+The most common pattern:
+
+```lua
+-- module.lua
+local M = {}
+
+function M.foo()
+  return "bar"
+end
+
+return M
+```
+
+### Factory Pattern
+
+Return a function that creates instances:
+
+```lua
+-- logger.lua
+return function(prefix)
+  local M = {}
+  
+  function M.log(message)
+    print(prefix .. ": " .. message)
+  end
+  
+  function M.error(message)
+    print(prefix .. " ERROR: " .. message)
+  end
+  
+  return M
+end
+```
+
+```lua
+local createLogger = require("logger")
+local log1 = createLogger("App")
+local log2 = createLogger("DB")
+
+log1.log("Starting")  -- App: Starting
+log2.error("Failed")  -- DB ERROR: Failed
+```
+
+### Singleton Pattern
+
+Share state across all requires:
+
+```lua
+-- config.lua
+local M = {
+  settings = {},
+  loaded = false
+}
+
+function M.load(filename)
+  if not M.loaded then
+    -- Load configuration from file
+    M.settings = {version = "1.0", debug = true}
+    M.loaded = true
+  end
+end
+
+function M.get(key)
+  return M.settings[key]
+end
+
+return M
+```
+
+```lua
+-- Both require calls get the same instance
+local config1 = require("config")
+local config2 = require("config")
+
+config1.load("app.conf")
+assert(config2.get("version") == "1.0")  -- Shares state
+```
+
+### Class Pattern
+
+Define a class in a module:
+
+```lua
+-- person.lua
+local Person = {}
+Person.__index = Person
+
+function Person.new(name, age)
+  local self = setmetatable({}, Person)
+  self.name = name
+  self.age = age
+  return self
+end
+
+function Person:introduce()
+  return "I'm " .. self.name .. ", " .. self.age .. " years old"
+end
+
+function Person:birthday()
+  self.age = self.age + 1
+end
+
+return Person
+```
+
+```lua
+local Person = require("person")
+
+local alice = Person.new("Alice", 30)
+local bob = Person.new("Bob", 25)
+
+print(alice:introduce())  -- I'm Alice, 30 years old
+alice:birthday()
+assert(alice.age == 31)
+```
+
+## Package Management
+
+### package.loaded
+
+Cache of loaded modules:
+
+```lua
+-- Check if module is loaded
+if package.loaded["mymodule"] then
+  print("Module already loaded")
+end
+
+-- Manually cache a module
+package.loaded["mymodule"] = {version = "1.0"}
+
+-- Force reload by clearing cache
+package.loaded["mymodule"] = nil
+local fresh = require("mymodule")  -- Reloads from file
+```
+
+### package.preload
+
+Register module loaders:
+
+```lua
+-- Register a module without a file
+package.preload["virtual"] = function()
+  local M = {}
+  function M.hello() return "Virtual module!" end
+  return M
+end
+
+local virtual = require("virtual")
+print(virtual.hello())  -- Virtual module!
+```
+
+### package.searchers
+
+Customize module loading:
+
+```lua
+-- Add custom searcher
+table.insert(package.searchers, function(modname)
+  if modname:sub(1, 4) == "net." then
+    -- Custom loader for network modules
+    return function()
+      return {name = modname, type = "network"}
+    end
+  end
+end)
+
+local netmod = require("net.http")
+print(netmod.name)  -- net.http
+```
+
+## Submodules and Namespaces
+
+### Directory Structure
+
+```
+myapp/
+  init.lua
+  core.lua
+  utils/
+    init.lua
+    string.lua
+    table.lua
+```
+
+### Main Module (myapp/init.lua)
+
+```lua
+local M = {}
+
+M.core = require("myapp.core")
+M.utils = require("myapp.utils")
+
+function M.start()
+  print("Application starting...")
+end
+
+return M
+```
+
+### Submodule (myapp/core.lua)
+
+```lua
+local M = {}
+
+function M.process()
+  return "Processing..."
+end
+
+return M
+```
+
+### Utils Module (myapp/utils/init.lua)
+
+```lua
+local M = {}
+
+M.string = require("myapp.utils.string")
+M.table = require("myapp.utils.table")
+
+return M
+```
+
+### Using the Module Hierarchy
+
+```lua
+local myapp = require("myapp")
+
+myapp.start()
+local result = myapp.core.process()
+local trimmed = myapp.utils.string.trim("  text  ")
+```
+
+## Circular Dependencies
+
+Handle modules that depend on each other:
+
+```lua
+-- module_a.lua
+local M = {}
+
+function M.foo()
+  local b = require("module_b")
+  return "A:" .. b.bar()
+end
+
+return M
+```
+
+```lua
+-- module_b.lua
+local M = {}
+
+function M.bar()
+  return "B"
+end
+
+function M.useFoo()
+  local a = require("module_a")
+  return a.foo()
+end
+
+return M
+```
+
+<Warning>
+Require modules inside functions, not at the top level, to avoid circular dependency issues.
+</Warning>
+
+## Module Versioning
+
+```lua
+-- mymodule.lua
+local M = {
+  _VERSION = "1.2.3",
+  _AUTHOR = "Your Name",
+  _LICENSE = "MIT"
+}
+
+function M.checkVersion(required)
+  -- Simple version checking
+  if M._VERSION < required then
+    error("Module version " .. required .. " required, got " .. M._VERSION)
+  end
+end
+
+return M
+```
+
+## C Module Integration
+
+Load and use C modules:
+
+```lua
+-- Load C module
+local cmodule = require("mycmodule")
+
+-- C modules can export functions
+local result = cmodule.native_function()
+
+-- Check if module is from C
+local cpath = package.searchpath("mycmodule", package.cpath)
+if cpath then
+  print("Loaded from C:", cpath)
+end
+```
+
+### Creating C Modules
+
+```c
+// mycmodule.c
+#include <lua.h>
+#include <lauxlib.h>
+
+static int my_function(lua_State *L) {
+    lua_pushstring(L, "Hello from C!");
+    return 1;
+}
+
+static const struct luaL_Reg mylib[] = {
+    {"my_function", my_function},
+    {NULL, NULL}
+};
+
+int luaopen_mycmodule(lua_State *L) {
+    luaL_newlib(L, mylib);
+    return 1;
+}
+```
+
+## Best Practices
+
+<Note>
+**Module Best Practices:**
+
+1. Use local variables for everything except the module table
+2. Return the module table at the end
+3. Don't modify global state (including `_G`)
+4. Use descriptive module names (avoid common names)
+5. Document public APIs with comments
+6. Version your modules
+7. Keep module files focused and single-purpose
+</Note>
+
+### Good Module Structure
+
+```lua
+-- goodmodule.lua
+
+-- Dependencies at top
+local math = require("math")
+local string = require("string")
+
+-- Module table
+local M = {
+  _VERSION = "1.0.0"
+}
+
+-- Private constants
+local DEFAULT_SIZE = 100
+
+-- Private functions
+local function validate(x)
+  return type(x) == "number"
+end
+
+-- Public API
+function M.calculate(x)
+  if not validate(x) then
+    error("Invalid input")
+  end
+  return x * DEFAULT_SIZE
+end
+
+function M.format(x)
+  return string.format("%.2f", x)
+end
+
+-- Return module
+return M
+```
+
+## Module Loading Example
+
+Complete example of module system:
+
+```lua
+-- utils.lua
+local M = {}
+
+function M.trim(s)
+  return s:match("^%s*(.-)%s*$")
+end
+
+function M.split(s, delimiter)
+  local result = {}
+  for match in (s..delimiter):gmatch("(.-) "..delimiter) do
+    table.insert(result, match)
+  end
+  return result
+end
+
+return M
+```
+
+```lua
+-- main.lua
+local utils = require("utils")
+
+local text = "  hello world  "
+local trimmed = utils.trim(text)
+print(trimmed)  -- "hello world"
+
+local parts = utils.split("a,b,c", ",")
+assert(#parts == 3)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Tables" icon="table" href="./tables">
+Review table features used in modules
+</Card>
+
+<Card title="Functions" icon="function" href="./functions">
+Understand module functions and closures
+</Card>
+
+<Card title="Metatables" icon="wand-magic-sparkles" href="./metatables">
+Advanced module patterns with metatables
+</Card>
+
+<Card title="Basics" icon="book" href="./basics">
+Review Lua fundamentals
+</Card>
+</CardGroup>

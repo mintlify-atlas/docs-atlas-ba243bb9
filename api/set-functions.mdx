@@ -1,0 +1,332 @@
+---
+title: Set Functions
+description: Functions for setting values in Lua tables and globals
+---
+
+## Overview
+
+These functions set values in Lua globals, tables, and metatables using values from the stack.
+
+## Functions
+
+### lua_setglobal
+
+Pops a value from the stack and sets it as the new value of global `name`.
+
+```c
+void lua_setglobal(lua_State *L, const char *name);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="name" type="const char*" required>
+  The name of the global variable
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+lua_pushinteger(L, 42);
+lua_setglobal(L, "answer");
+// Global variable 'answer' is now 42
+
+lua_pushcfunction(L, my_function);
+lua_setglobal(L, "myfunc");
+// Global 'myfunc' is now the C function
+```
+
+### lua_settable
+
+Does the equivalent to `t[k] = v`, where `t` is the table at the given index, `v` is the value on top of the stack, and `k` is the value just below the top.
+
+```c
+void lua_settable(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+**Returns:** Nothing. Pops both the key and value from the stack.
+
+**Example:**
+
+```c
+lua_newtable(L);                // Stack: table
+lua_pushstring(L, "name");      // Stack: table, "name"
+lua_pushstring(L, "John");      // Stack: table, "name", "John"
+lua_settable(L, -3);            // Stack: table (with table.name = "John")
+```
+
+### lua_setfield
+
+Does the equivalent to `t[k] = v`, where `t` is the table at the given index and `v` is the value on top of the stack.
+
+```c
+void lua_setfield(lua_State *L, int idx, const char *k);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+<ParamField path="k" type="const char*" required>
+  The field name
+</ParamField>
+
+**Returns:** Nothing. Pops the value from the stack.
+
+**Example:**
+
+```c
+lua_newtable(L);                // Stack: table
+lua_pushstring(L, "John");      // Stack: table, "John"
+lua_setfield(L, -2, "name");    // Stack: table (with table.name = "John")
+
+lua_pushinteger(L, 42);
+lua_setfield(L, -2, "age");     // Stack: table (with table.age = 42)
+```
+
+### lua_seti
+
+Does the equivalent to `t[n] = v`, where `t` is the table at the given index and `v` is the value on top of the stack.
+
+```c
+void lua_seti(lua_State *L, int idx, lua_Integer n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+<ParamField path="n" type="lua_Integer" required>
+  The integer key
+</ParamField>
+
+**Returns:** Nothing. Pops the value from the stack.
+
+**Example:**
+
+```c
+lua_newtable(L);                // Stack: table
+for (int i = 1; i <= 5; i++) {
+    lua_pushinteger(L, i * 10); // Stack: table, value
+    lua_seti(L, -2, i);         // Stack: table (with t[i] = i*10)
+}
+// Result: table = {10, 20, 30, 40, 50}
+```
+
+### lua_rawset
+
+Similar to `lua_settable`, but does a raw assignment (without metamethods).
+
+```c
+void lua_rawset(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+**Returns:** Nothing. Pops both the key and value from the stack.
+
+**Example:**
+
+```c
+lua_getglobal(L, "t");          // Stack: t
+lua_pushstring(L, "key");       // Stack: t, "key"
+lua_pushstring(L, "value");     // Stack: t, "key", "value"
+lua_rawset(L, -3);              // Stack: t (t.key = "value", no __newindex)
+```
+
+### lua_rawseti
+
+Does the equivalent to `t[n] = v`, where `t` is the table at the given index (raw access).
+
+```c
+void lua_rawseti(lua_State *L, int idx, lua_Integer n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+<ParamField path="n" type="lua_Integer" required>
+  The integer key
+</ParamField>
+
+**Returns:** Nothing. Pops the value from the stack.
+
+**Example:**
+
+```c
+lua_pushstring(L, "item");
+lua_rawseti(L, 1, 10);  // t[10] = "item" (no metamethods)
+```
+
+### lua_rawsetp
+
+Does the equivalent to `t[p] = v`, where `t` is the table at the given index, `p` is a light userdata, and `v` is the value on top of the stack.
+
+```c
+void lua_rawsetp(lua_State *L, int idx, const void *p);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+<ParamField path="p" type="const void*" required>
+  The pointer key
+</ParamField>
+
+**Returns:** Nothing. Pops the value from the stack.
+
+**Example:**
+
+```c
+void *key = &my_global_var;
+lua_pushstring(L, "my data");
+lua_rawsetp(L, LUA_REGISTRYINDEX, key);
+// Stores "my data" with pointer key in registry
+```
+
+### lua_setmetatable
+
+Pops a table or nil from the stack and sets it as the new metatable for the value at the given index.
+
+```c
+int lua_setmetatable(lua_State *L, int objindex);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="objindex" type="int" required>
+  The stack index of the object
+</ParamField>
+
+**Returns:** 1 (this function cannot fail).
+
+**Example:**
+
+```c
+// Create a table and set its metatable
+lua_newtable(L);                     // Stack: table
+lua_newtable(L);                     // Stack: table, metatable
+lua_pushcfunction(L, tostring_func); // Stack: table, mt, func
+lua_setfield(L, -2, "__tostring");  // Stack: table, mt
+lua_setmetatable(L, -2);             // Stack: table (with metatable)
+```
+
+### lua_setiuservalue
+
+Pops a value from the stack and sets it as the n-th user value associated with the full userdata at the given index.
+
+```c
+int lua_setiuservalue(lua_State *L, int idx, int n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the userdata
+</ParamField>
+
+<ParamField path="n" type="int" required>
+  The user value index (1-based)
+</ParamField>
+
+**Returns:** 1 if successful, 0 if the index is out of range.
+
+**Example:**
+
+```c
+void *ud = lua_newuserdatauv(L, sizeof(MyData), 2);
+
+// Set first user value
+lua_pushstring(L, "metadata");
+lua_setiuservalue(L, -2, 1);
+
+// Set second user value
+lua_newtable(L);
+lua_setiuservalue(L, -2, 2);
+```
+
+## Helper Macros
+
+```c
+#define lua_register(L,n,f) (lua_pushcfunction(L, (f)), lua_setglobal(L, (n)))
+#define lua_setuservalue(L,idx) lua_setiuservalue(L,idx,1)
+```
+
+**Example:**
+
+```c
+// Register a C function as a global
+lua_register(L, "myfunc", my_c_function);
+// Equivalent to:
+// lua_pushcfunction(L, my_c_function);
+// lua_setglobal(L, "myfunc");
+```
+
+## Complete Example
+
+```c
+void create_config_table(lua_State *L) {
+    lua_newtable(L);  // Create main table
+    
+    // Set string fields
+    lua_pushstring(L, "MyApp");
+    lua_setfield(L, -2, "name");
+    
+    lua_pushstring(L, "1.0.0");
+    lua_setfield(L, -2, "version");
+    
+    // Set numeric field
+    lua_pushinteger(L, 8080);
+    lua_setfield(L, -2, "port");
+    
+    // Create nested array
+    lua_newtable(L);
+    for (int i = 1; i <= 3; i++) {
+        lua_pushinteger(L, i * 100);
+        lua_seti(L, -2, i);
+    }
+    lua_setfield(L, -2, "values");
+    
+    // Set as global
+    lua_setglobal(L, "config");
+}
+```

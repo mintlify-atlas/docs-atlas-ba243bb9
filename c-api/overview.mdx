@@ -1,0 +1,231 @@
+---
+title: C API Overview
+description: Introduction to Lua's C API for embedding and extending
+---
+
+## Introduction
+
+Lua's C API is the interface between Lua and C/C++ code. It allows you to:
+
+- **Embed** Lua into applications as a scripting language
+- **Extend** Lua by writing C functions callable from Lua
+- **Exchange** data between C and Lua environments
+- **Control** Lua execution from C code
+
+The C API is defined in `lua.h` and provides a complete interface for interacting with the Lua virtual machine.
+
+## Core Concepts
+
+### The Lua State
+
+All interaction with Lua happens through a `lua_State` pointer. This opaque structure represents a Lua execution thread and maintains the entire state of the Lua environment.
+
+```c
+typedef struct lua_State lua_State;
+```
+
+Each Lua state is independent and has its own:
+- Global environment
+- Stack
+- Loaded modules
+- Memory allocator
+
+### The Virtual Stack
+
+The C API uses a **virtual stack** to exchange values between C and Lua. This stack is different from the C call stack:
+
+- Values are pushed onto the stack from C
+- Lua functions receive arguments from the stack
+- Results are left on the stack for C to retrieve
+- Stack indices can be positive (from bottom) or negative (from top)
+
+<Warning>
+The stack has a minimum guaranteed size of `LUA_MINSTACK` (20) slots. For larger operations, use `lua_checkstack()` to ensure enough space.
+</Warning>
+
+## API Organization
+
+The Lua C API is organized into several functional areas:
+
+### State Manipulation
+
+```c
+lua_State *lua_newstate(lua_Alloc f, void *ud, unsigned seed);
+void lua_close(lua_State *L);
+```
+
+Create and destroy Lua states.
+
+### Stack Operations
+
+```c
+int lua_gettop(lua_State *L);
+void lua_settop(lua_State *L, int idx);
+void lua_pushvalue(lua_State *L, int idx);
+```
+
+Manipulate the virtual stack.
+
+### Push Functions (C → Stack)
+
+```c
+void lua_pushnil(lua_State *L);
+void lua_pushnumber(lua_State *L, lua_Number n);
+void lua_pushstring(lua_State *L, const char *s);
+```
+
+Push C values onto the Lua stack.
+
+### Access Functions (Stack → C)
+
+```c
+int lua_type(lua_State *L, int idx);
+lua_Number lua_tonumber(lua_State *L, int idx);
+const char *lua_tostring(lua_State *L, int idx);
+```
+
+Retrieve values from the Lua stack.
+
+### Call Functions
+
+```c
+void lua_call(lua_State *L, int nargs, int nresults);
+int lua_pcall(lua_State *L, int nargs, int nresults, int errfunc);
+```
+
+Call Lua functions from C.
+
+### Get/Set Functions
+
+```c
+int lua_getglobal(lua_State *L, const char *name);
+void lua_setglobal(lua_State *L, const char *name);
+int lua_gettable(lua_State *L, int idx);
+void lua_settable(lua_State *L, int idx);
+```
+
+Access Lua tables and global variables.
+
+## Type System
+
+Lua has the following basic types (defined in lua.h:62-72):
+
+```c
+#define LUA_TNIL            0
+#define LUA_TBOOLEAN        1
+#define LUA_TLIGHTUSERDATA  2
+#define LUA_TNUMBER         3
+#define LUA_TSTRING         4
+#define LUA_TTABLE          5
+#define LUA_TFUNCTION       6
+#define LUA_TUSERDATA       7
+#define LUA_TTHREAD         8
+```
+
+Use `lua_type(L, idx)` to query the type of a stack value.
+
+## Function Types
+
+### C Functions
+
+C functions callable from Lua must have this signature:
+
+```c
+typedef int (*lua_CFunction)(lua_State *L);
+```
+
+The function:
+- Receives arguments from the stack (bottom to top)
+- Returns the number of return values left on the stack
+- Can return 0 for no return values
+
+### Example
+
+```c
+static int my_add(lua_State *L) {
+    lua_Number a = lua_tonumber(L, 1);  // First argument
+    lua_Number b = lua_tonumber(L, 2);  // Second argument
+    lua_pushnumber(L, a + b);           // Push result
+    return 1;                           // One return value
+}
+```
+
+## Error Handling
+
+Lua uses **longjmp** for error handling. When an error occurs:
+
+1. Lua unwinds the stack
+2. Calls are rolled back to a protected call boundary
+3. Control returns to the nearest `lua_pcall` or `lua_pcallk`
+
+<Warning>
+Never use `lua_error()` or functions that may raise errors without being inside a protected call. Always use `lua_pcall()` for calls that might fail.
+</Warning>
+
+### Status Codes
+
+```c
+#define LUA_OK          0
+#define LUA_YIELD       1
+#define LUA_ERRRUN      2  // Runtime error
+#define LUA_ERRSYNTAX   3  // Syntax error
+#define LUA_ERRMEM      4  // Memory allocation error
+#define LUA_ERRERR      5  // Error in error handler
+```
+
+## Auxiliary Library
+
+The auxiliary library (`lauxlib.h`) provides higher-level convenience functions:
+
+```c
+#include "lauxlib.h"
+
+luaL_checkinteger(L, 1);  // Check and get integer argument
+luaL_error(L, "error: %s", msg);  // Raise formatted error
+luaL_newstate();  // Create state with default allocator
+```
+
+These functions simplify common tasks and provide better error messages.
+
+## Memory Management
+
+Lua manages its own memory using a custom allocator:
+
+```c
+typedef void *(*lua_Alloc)(void *ud, void *ptr, size_t osize, size_t nsize);
+```
+
+- All Lua objects are garbage collected
+- C code does not need to free Lua strings, tables, etc.
+- Userdata can hold C resources that need manual cleanup
+
+## Thread Safety
+
+<Warning>
+A `lua_State` is **not thread-safe**. Each thread must have its own Lua state, or access must be synchronized with mutexes.
+</Warning>
+
+You can create new coroutine states that share the same global state:
+
+```c
+lua_State *L1 = lua_newthread(L);
+```
+
+## Version Information
+
+Lua 5.5.1 version constants (lua.h:20-25):
+
+```c
+#define LUA_VERSION_MAJOR_N   5
+#define LUA_VERSION_MINOR_N   5
+#define LUA_VERSION_RELEASE_N 1
+#define LUA_VERSION_NUM       550
+```
+
+## Next Steps
+
+- [Embedding Lua](/c-api/embedding) - Learn how to embed Lua in your application
+- [The Stack](/c-api/stack) - Understand the virtual stack in detail
+- [Calling Lua](/c-api/calling-lua) - Call Lua functions from C
+- [Registering Functions](/c-api/registering-functions) - Make C functions callable from Lua
+- [Userdata](/c-api/userdata) - Manage C objects in Lua

@@ -1,0 +1,507 @@
+---
+title: Calling Lua from C
+description: How to call Lua functions from C code using the C API
+---
+
+## Overview
+
+Calling Lua functions from C involves:
+
+1. Pushing the function onto the stack
+2. Pushing arguments onto the stack
+3. Calling the function with `lua_call()` or `lua_pcall()`
+4. Retrieving results from the stack
+
+The function call consumes the function and arguments, leaving only results on the stack.
+
+## Basic Function Calls
+
+### Using lua_pcall (Protected Call)
+
+`lua_pcall()` is the safe way to call Lua functions (lapi.c:1076-1117):
+
+```c
+int lua_pcall(lua_State *L, int nargs, int nresults, int errfunc);
+```
+
+Parameters:
+- `nargs`: Number of arguments pushed onto the stack
+- `nresults`: Number of expected return values (or `LUA_MULTRET` for all)
+- `errfunc`: Stack index of error handler function (or 0 for none)
+
+Returns:
+- `LUA_OK` (0) on success
+- Error code on failure (`LUA_ERRRUN`, `LUA_ERRMEM`, `LUA_ERRERR`)
+
+<Steps>
+
+### Get the Function
+
+Push the Lua function onto the stack:
+
+```c
+lua_getglobal(L, "my_function");  // Get global function
+
+if (!lua_isfunction(L, -1)) {
+    lua_pop(L, 1);
+    fprintf(stderr, "'my_function' is not a function\n");
+    return;
+}
+```
+
+### Push Arguments
+
+Push function arguments in order:
+
+```c
+lua_pushinteger(L, 10);      // First argument
+lua_pushstring(L, "hello");  // Second argument
+lua_pushboolean(L, 1);       // Third argument
+
+// Stack: [function, 10, "hello", true]
+```
+
+### Call the Function
+
+Call with `lua_pcall()`:
+
+```c
+int status = lua_pcall(L, 3, 1, 0);  // 3 args, 1 result, no error handler
+
+if (status != LUA_OK) {
+    const char *msg = lua_tostring(L, -1);
+    fprintf(stderr, "Error: %s\n", msg);
+    lua_pop(L, 1);  // Remove error message
+    return;
+}
+
+// Stack: [result]
+```
+
+### Get Results
+
+Retrieve return values:
+
+```c
+if (lua_isnumber(L, -1)) {
+    lua_Integer result = lua_tointeger(L, -1);
+    printf("Result: %lld\n", result);
+}
+lua_pop(L, 1);  // Remove result
+
+// Stack: []
+```
+
+</Steps>
+
+## Complete Example
+
+```c
+#include <stdio.h>
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+
+int main(void) {
+    lua_State *L = luaL_newstate();
+    luaL_openlibs(L);
+    
+    // Define a Lua function
+    const char *code = 
+        "function add(a, b)\n"
+        "    return a + b\n"
+        "end";
+    
+    if (luaL_dostring(L, code) != LUA_OK) {
+        fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+        lua_close(L);
+        return 1;
+    }
+    
+    // Get the function
+    lua_getglobal(L, "add");
+    
+    // Push arguments
+    lua_pushinteger(L, 15);
+    lua_pushinteger(L, 27);
+    
+    // Call function: 2 args, 1 result
+    if (lua_pcall(L, 2, 1, 0) != LUA_OK) {
+        fprintf(stderr, "Error calling 'add': %s\n", lua_tostring(L, -1));
+        lua_pop(L, 1);
+        lua_close(L);
+        return 1;
+    }
+    
+    // Get result
+    if (lua_isinteger(L, -1)) {
+        lua_Integer result = lua_tointeger(L, -1);
+        printf("15 + 27 = %lld\n", result);
+    }
+    
+    lua_pop(L, 1);
+    lua_close(L);
+    return 0;
+}
+```
+
+Output:
+```
+15 + 27 = 42
+```
+
+## Multiple Return Values
+
+Lua functions can return multiple values:
+
+```c
+// Define a function that returns multiple values
+luaL_dostring(L, "function multi() return 1, 2, 3 end");
+
+lua_getglobal(L, "multi");
+lua_pcall(L, 0, 3, 0);  // 0 args, 3 results
+
+// Stack: [1, 2, 3]
+lua_Integer r1 = lua_tointeger(L, -3);
+lua_Integer r2 = lua_tointeger(L, -2);
+lua_Integer r3 = lua_tointeger(L, -1);
+
+printf("Results: %lld, %lld, %lld\n", r1, r2, r3);
+lua_pop(L, 3);
+```
+
+### Variable Number of Returns
+
+Use `LUA_MULTRET` to accept all return values (lua.h:35):
+
+```c
+lua_getglobal(L, "multi");
+lua_pcall(L, 0, LUA_MULTRET, 0);  // Accept all results
+
+int nresults = lua_gettop(L);
+printf("Function returned %d values\n", nresults);
+
+for (int i = 1; i <= nresults; i++) {
+    printf("  Result %d: %lld\n", i, lua_tointeger(L, i));
+}
+
+lua_settop(L, 0);  // Clear stack
+```
+
+## Error Handling
+
+### Without Error Handler
+
+Simple error handling:
+
+```c
+int status = lua_pcall(L, nargs, nresults, 0);
+
+switch (status) {
+    case LUA_OK:
+        // Success - results are on stack
+        break;
+        
+    case LUA_ERRRUN:
+        fprintf(stderr, "Runtime error: %s\n", lua_tostring(L, -1));
+        lua_pop(L, 1);
+        break;
+        
+    case LUA_ERRMEM:
+        fprintf(stderr, "Memory allocation error\n");
+        lua_pop(L, 1);
+        break;
+        
+    case LUA_ERRERR:
+        fprintf(stderr, "Error in error handler\n");
+        lua_pop(L, 1);
+        break;
+}
+```
+
+### With Error Handler
+
+Provide a custom error handler to add stack traces:
+
+```c
+// Push error handler function (typically from debug library)
+lua_getglobal(L, "debug");
+lua_getfield(L, -1, "traceback");
+lua_remove(L, -2);  // Remove 'debug' table
+
+int error_handler_idx = lua_gettop(L);
+
+// Push function and arguments
+lua_getglobal(L, "my_function");
+lua_pushinteger(L, 42);
+
+// Call with error handler
+int status = lua_pcall(L, 1, 1, error_handler_idx);
+
+if (status != LUA_OK) {
+    fprintf(stderr, "Error:\n%s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);  // Remove error message
+}
+
+lua_remove(L, error_handler_idx);  // Remove error handler
+```
+
+The error handler receives the error object and returns an enhanced error message (typically with stack trace).
+
+## Using lua_call (Unprotected Call)
+
+`lua_call()` is faster but doesn't catch errors (lua.h:295):
+
+```c
+void lua_call(lua_State *L, int nargs, int nresults);
+```
+
+<Warning>
+If an error occurs in `lua_call()`, it will longjmp out, potentially bypassing cleanup code. Only use this when:
+- You're inside a protected environment (already in a `lua_pcall`)
+- You're certain the function cannot fail
+- Performance is critical
+</Warning>
+
+Example:
+
+```c
+lua_getglobal(L, "safe_function");
+lua_pushinteger(L, 10);
+lua_call(L, 1, 1);  // No error handling!
+lua_Integer result = lua_tointeger(L, -1);
+lua_pop(L, 1);
+```
+
+## Calling Table Methods
+
+Call a method on a table object:
+
+```c
+// Get the table
+lua_getglobal(L, "myobject");
+
+// Get the method
+lua_getfield(L, -1, "method_name");
+
+// Push the table as 'self'
+lua_pushvalue(L, -2);
+
+// Push other arguments
+lua_pushinteger(L, 42);
+
+// Call: self + 1 arg, 1 result
+if (lua_pcall(L, 2, 1, 0) != LUA_OK) {
+    fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 2);  // Remove error and table
+    return;
+}
+
+// Get result (table is still at -2)
+lua_Integer result = lua_tointeger(L, -1);
+lua_pop(L, 2);  // Remove result and table
+```
+
+Example Lua code:
+
+```lua
+myobject = {
+    value = 10,
+    method_name = function(self, x)
+        return self.value + x
+    end
+}
+```
+
+## Calling Callable Tables
+
+Tables with `__call` metamethod:
+
+```c
+// Lua code: setmetatable({}, {__call = function(t, x) return x * 2 end})
+
+lua_getglobal(L, "callable_table");
+lua_pushinteger(L, 5);
+
+if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
+    fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);
+} else {
+    printf("Result: %lld\n", lua_tointeger(L, -1));
+    lua_pop(L, 1);
+}
+```
+
+## Loading and Calling in One Step
+
+Load and execute Lua code in a single operation:
+
+```c
+// Load Lua code that returns a function
+const char *code = "return function(x) return x * x end";
+
+if (luaL_loadstring(L, code) != LUA_OK) {
+    fprintf(stderr, "Load error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);
+    return;
+}
+
+// Execute to get the function
+if (lua_pcall(L, 0, 1, 0) != LUA_OK) {
+    fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);
+    return;
+}
+
+// Now call the returned function
+lua_pushinteger(L, 7);
+if (lua_pcall(L, 1, 1, 0) == LUA_OK) {
+    printf("7 squared = %lld\n", lua_tointeger(L, -1));
+    lua_pop(L, 1);
+}
+```
+
+## Handling Varargs
+
+Call a function with variable arguments:
+
+```c
+int call_varargs(lua_State *L, const char *funcname, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    
+    lua_getglobal(L, funcname);
+    
+    int nargs = 0;
+    for (const char *p = fmt; *p; p++) {
+        switch (*p) {
+            case 'i':  // integer
+                lua_pushinteger(L, va_arg(args, lua_Integer));
+                nargs++;
+                break;
+            case 's':  // string
+                lua_pushstring(L, va_arg(args, const char *));
+                nargs++;
+                break;
+            case 'f':  // float
+                lua_pushnumber(L, va_arg(args, lua_Number));
+                nargs++;
+                break;
+        }
+    }
+    
+    va_end(args);
+    
+    int status = lua_pcall(L, nargs, 0, 0);
+    if (status != LUA_OK) {
+        fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+        lua_pop(L, 1);
+        return 0;
+    }
+    
+    return 1;
+}
+
+// Usage
+call_varargs(L, "print", "sis", "Value:", 42, "done");
+```
+
+## Performance Considerations
+
+### Caching Functions
+
+If calling the same function repeatedly, cache it:
+
+```c
+// Cache the function in registry
+lua_getglobal(L, "expensive_lookup");
+lua_setfield(L, LUA_REGISTRYINDEX, "my_cached_func");
+
+// Later, retrieve from registry
+for (int i = 0; i < 1000; i++) {
+    lua_getfield(L, LUA_REGISTRYINDEX, "my_cached_func");
+    lua_pushinteger(L, i);
+    lua_pcall(L, 1, 0, 0);
+}
+```
+
+### Minimize Stack Operations
+
+Reduce unnecessary stack manipulations:
+
+```c
+// Less efficient
+lua_getglobal(L, "func");
+lua_pushinteger(L, 1);
+lua_pcall(L, 1, 1, 0);
+lua_pop(L, 1);
+
+lua_getglobal(L, "func");
+lua_pushinteger(L, 2);
+lua_pcall(L, 1, 1, 0);
+lua_pop(L, 1);
+
+// More efficient - cache function
+lua_getglobal(L, "func");
+for (int i = 0; i < N; i++) {
+    lua_pushvalue(L, -1);  // Copy function
+    lua_pushinteger(L, i);
+    lua_pcall(L, 1, 0, 0);
+}
+lua_pop(L, 1);  // Remove function
+```
+
+## Common Patterns
+
+### Pattern 1: Call and Check Boolean Result
+
+```c
+int call_predicate(lua_State *L, const char *func, int value) {
+    lua_getglobal(L, func);
+    lua_pushinteger(L, value);
+    
+    if (lua_pcall(L, 1, 1, 0) != LUA_OK) {
+        fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+        lua_pop(L, 1);
+        return 0;
+    }
+    
+    int result = lua_toboolean(L, -1);
+    lua_pop(L, 1);
+    return result;
+}
+```
+
+### Pattern 2: Optional Error Handler
+
+```c
+int call_safe(lua_State *L, int nargs, int nresults) {
+    int base = lua_gettop(L) - nargs;
+    lua_pushcfunction(L, lua_traceback);
+    lua_insert(L, base);
+    
+    int status = lua_pcall(L, nargs, nresults, base);
+    
+    lua_remove(L, base);  // Remove error handler
+    return status;
+}
+```
+
+## Best Practices
+
+1. **Always use `lua_pcall()`** - Prefer protected calls in production code
+2. **Check return status** - Handle all error cases
+3. **Clean up on error** - Pop error messages from the stack
+4. **Use error handlers** - Add stack traces for debugging
+5. **Cache frequently called functions** - Store in registry or as upvalues
+6. **Balance the stack** - Ensure stack is clean after calls
+
+<Warning>
+Failing to check `lua_pcall()` return values can lead to stack corruption and crashes.
+</Warning>
+
+## Next Steps
+
+- [Registering Functions](/c-api/registering-functions) - Make C functions callable from Lua
+- [Userdata](/c-api/userdata) - Pass C objects to Lua functions
+- [The Stack](/c-api/stack) - Deep dive into stack manipulation

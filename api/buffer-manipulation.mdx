@@ -1,0 +1,265 @@
+---
+title: 'Buffer Manipulation'
+description: 'Auxiliary library buffer functions for efficient string building'
+---
+
+The Lua auxiliary library provides a buffer system for efficient string building. This avoids the overhead of repeated string concatenations.
+
+## Buffer Structure
+
+The `luaL_Buffer` structure manages a dynamic buffer for building strings incrementally.
+
+```c
+typedef struct luaL_Buffer {
+  char *b;           /* buffer address */
+  size_t size;       /* buffer size */
+  size_t n;          /* number of characters in buffer */
+  lua_State *L;
+  union {
+    LUAI_MAXALIGN;
+    char b[LUAL_BUFFERSIZE];  /* initial buffer */
+  } init;
+} luaL_Buffer;
+```
+
+## Basic Buffer Operations
+
+<Accordion title="luaL_buffinit">
+Initializes a buffer.
+
+```c
+void luaL_buffinit (lua_State *L, luaL_Buffer *B);
+```
+
+**Parameters:**
+- `L` - Lua state
+- `B` - Buffer to initialize
+
+**Example:**
+```lua
+-- In C, this pattern is used:
+-- luaL_Buffer b;
+-- luaL_buffinit(L, &b);
+-- luaL_addstring(&b, "Hello");
+-- luaL_addstring(&b, " World");
+-- luaL_pushresult(&b);
+
+-- In Lua, use table.concat for similar functionality:
+local parts = {}
+table.insert(parts, "Hello")
+table.insert(parts, " World")
+local result = table.concat(parts)
+```
+</Accordion>
+
+<Accordion title="luaL_prepbuffsize">
+Returns an address to a space of size `sz` where you can copy a string to be added to buffer `B`.
+
+```c
+char *luaL_prepbuffsize (luaL_Buffer *B, size_t sz);
+```
+
+**Parameters:**
+- `B` - Buffer
+- `sz` - Size needed
+
+**Returns:** Pointer to buffer space
+
+**Usage:** After copying the string, call `luaL_addsize` to update the buffer length.
+</Accordion>
+
+<Accordion title="luaL_addsize">
+Adds to the buffer a string of length `n` previously copied to the buffer area.
+
+```c
+void luaL_addsize (luaL_Buffer *B, size_t n);
+```
+
+**Parameters:**
+- `B` - Buffer
+- `n` - Number of bytes to add
+</Accordion>
+
+<Accordion title="luaL_pushresult">
+Finishes the use of buffer `B` leaving the final string on the top of the stack.
+
+```c
+void luaL_pushresult (luaL_Buffer *B);
+```
+
+**Parameters:**
+- `B` - Buffer to finalize
+</Accordion>
+
+<Accordion title="luaL_pushresultsize">
+Equivalent to calling `luaL_addsize` followed by `luaL_pushresult`.
+
+```c
+void luaL_pushresultsize (luaL_Buffer *B, size_t sz);
+```
+</Accordion>
+
+## Adding Content
+
+<Accordion title="luaL_addlstring">
+Adds a string of length `l` to the buffer.
+
+```c
+void luaL_addlstring (luaL_Buffer *B, const char *s, size_t l);
+```
+
+**Parameters:**
+- `B` - Buffer
+- `s` - String to add
+- `l` - Length of string
+
+**Example:**
+```lua
+-- Building a string from parts
+local result = "prefix" .. "middle" .. "suffix"
+```
+</Accordion>
+
+<Accordion title="luaL_addstring">
+Adds a zero-terminated string to the buffer.
+
+```c
+void luaL_addstring (luaL_Buffer *B, const char *s);
+```
+
+**Parameters:**
+- `B` - Buffer
+- `s` - Null-terminated string to add
+</Accordion>
+
+<Accordion title="luaL_addchar">
+Adds a single character to the buffer.
+
+```c
+void luaL_addchar (luaL_Buffer *B, char c);
+```
+
+**Parameters:**
+- `B` - Buffer
+- `c` - Character to add
+
+**Example:**
+```lua
+-- Building a string character by character
+local chars = {}
+for i = 65, 90 do  -- ASCII A-Z
+  table.insert(chars, string.char(i))
+end
+local alphabet = table.concat(chars)
+```
+</Accordion>
+
+<Accordion title="luaL_addvalue">
+Adds the value on the top of the stack to the buffer. Pops the value.
+
+```c
+void luaL_addvalue (luaL_Buffer *B);
+```
+
+**Parameters:**
+- `B` - Buffer
+</Accordion>
+
+<Accordion title="luaL_addgsub">
+Adds to the buffer a copy of string `s` with all occurrences of pattern `p` replaced by `r`.
+
+```c
+void luaL_addgsub (luaL_Buffer *B, const char *s,
+                   const char *p, const char *r);
+```
+
+**Parameters:**
+- `B` - Buffer
+- `s` - Source string
+- `p` - Pattern to replace
+- `r` - Replacement string
+</Accordion>
+
+## Initialization Helpers
+
+<Accordion title="luaL_buffinitsize">
+Equivalent to calling `luaL_buffinit` followed by `luaL_prepbuffsize`.
+
+```c
+char *luaL_buffinitsize (lua_State *L, luaL_Buffer *B, size_t sz);
+```
+
+**Parameters:**
+- `L` - Lua state
+- `B` - Buffer to initialize
+- `sz` - Initial size
+
+**Returns:** Pointer to buffer space
+</Accordion>
+
+## Macros
+
+<Accordion title="luaL_prepbuffer">
+Prepares a buffer with a default size (LUAL_BUFFERSIZE).
+
+```c
+#define luaL_prepbuffer(B)  luaL_prepbuffsize(B, LUAL_BUFFERSIZE)
+```
+</Accordion>
+
+<Accordion title="luaL_bufflen">
+Returns the current length of the buffer.
+
+```c
+#define luaL_bufflen(bf)  ((bf)->n)
+```
+</Accordion>
+
+<Accordion title="luaL_buffaddr">
+Returns the address of the buffer.
+
+```c
+#define luaL_buffaddr(bf)  ((bf)->b)
+```
+</Accordion>
+
+<Accordion title="luaL_buffsub">
+Removes `s` bytes from the buffer.
+
+```c
+#define luaL_buffsub(B,s)  ((B)->n -= (s))
+```
+</Accordion>
+
+## Usage Example
+
+```lua
+-- Lua equivalent of efficient string building
+local function buildLargeString()
+  local parts = {}
+  
+  -- Add many parts
+  for i = 1, 1000 do
+    table.insert(parts, "Item " .. i)
+  end
+  
+  -- Concatenate efficiently
+  return table.concat(parts, "\n")
+end
+
+-- Inefficient approach (avoid):
+local function inefficientBuild()
+  local result = ""
+  for i = 1, 1000 do
+    result = result .. "Item " .. i .. "\n"  -- Creates many temporary strings
+  end
+  return result
+end
+```
+
+## Performance Tips
+
+1. **Use buffers for incremental string building** - Avoid repeated concatenation
+2. **Pre-allocate when size is known** - Use `luaL_buffinitsize` for better performance
+3. **In Lua, use table.concat** - For similar efficiency without C code
+4. **Avoid string.rep in loops** - Use buffer operations instead

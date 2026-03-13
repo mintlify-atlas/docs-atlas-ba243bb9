@@ -1,0 +1,466 @@
+---
+title: Control Flow
+description: Master conditional statements, loops, and control structures in Lua
+---
+
+## Conditional Statements
+
+### If-Then-Else
+
+Basic conditional execution:
+
+```lua
+local x = 10
+
+if x > 5 then
+  print("x is greater than 5")
+end
+
+if x > 20 then
+  print("x is greater than 20")
+else
+  print("x is not greater than 20")
+end
+```
+
+### Elseif
+
+Chain multiple conditions:
+
+```lua
+local function classify(i)
+  if i < 10 then
+    return 'a'
+  elseif i < 20 then
+    return 'b'
+  elseif i < 30 then
+    return 'c'
+  else
+    return 'other'
+  end
+end
+
+assert(classify(3) == 'a')
+assert(classify(12) == 'b')
+assert(classify(26) == 'c')
+assert(classify(100) == nil)
+```
+
+<Note>
+The `else` clause is optional. If no condition matches and there's no `else`, the result is `nil`.
+</Note>
+
+### Ternary-like Expressions
+
+Lua doesn't have a ternary operator, but you can use `and`/`or`:
+
+```lua
+local x, y = 1, 2
+local max = (x > y) and x or y
+assert(max == 2)
+
+-- Be careful with falsy values!
+local result = (x > y) and x or y
+-- If x is 0 or false, this won't work as expected
+```
+
+## Loops
+
+### While Loop
+
+Execute while a condition is true:
+
+```lua
+local i = 1
+while i <= 5 do
+  print(i)
+  i = i + 1
+end
+
+-- Infinite loops (use with break)
+while true do
+  local input = io.read()
+  if input == "quit" then break end
+  print("You said:", input)
+end
+```
+
+### Repeat-Until Loop
+
+Execute at least once, then check condition:
+
+```lua
+local i = 1
+repeat
+  print(i)
+  i = i + 1
+until i > 5
+
+-- Condition check example
+local function f(b)
+  local x = 1
+  repeat
+    local a
+    if b == 1 then
+      x = 10
+      break
+    elseif b == 2 then
+      x = 20
+      break
+    elseif b == 3 then
+      x = 30
+    else
+      x = x + 1
+    end
+  until x >= 12
+  return x
+end
+
+assert(f(1) == 10)
+assert(f(2) == 20)
+assert(f(3) == 30)
+assert(f(4) == 12)
+```
+
+<Note>
+In `repeat-until`, the loop body is executed before the condition is checked, guaranteeing at least one iteration.
+</Note>
+
+### Numeric For Loop
+
+Iterate over a numeric range:
+
+<Tabs>
+<Tab title="Basic Range">
+```lua
+-- From 1 to 10
+for i = 1, 10 do
+  print(i)
+end
+
+-- With custom step
+for i = 1, 10, 2 do
+  print(i)  -- prints 1, 3, 5, 7, 9
+end
+
+-- Counting down
+for i = 10, 1, -1 do
+  print(i)
+end
+```
+</Tab>
+
+<Tab title="Variable Scope">
+```lua
+-- Loop variable is local to the loop
+for i = 1, 3 do
+  print(i)
+end
+-- print(i)  -- Error: i is not defined here
+
+-- Complex initialization
+local n = 100
+local i = 3
+local t = {}
+local a = nil
+
+while not a do
+  a = 0
+  for i = 1, n do
+    for i = i, 1, -1 do
+      a = a + 1
+      t[i] = 1
+    end
+  end
+end
+
+assert(a == n * (n + 1) / 2)
+```
+</Tab>
+</Tabs>
+
+### Generic For Loop (Iterators)
+
+Iterate over collections using iterators:
+
+<CodeGroup>
+```lua ipairs (Array)
+-- Iterate over array part
+local fruits = {"apple", "banana", "cherry"}
+
+for i, fruit in ipairs(fruits) do
+  print(i, fruit)
+end
+-- Output:
+-- 1  apple
+-- 2  banana  
+-- 3  cherry
+```
+
+```lua pairs (All Keys)
+-- Iterate over all key-value pairs
+local person = {
+  name = "Alice",
+  age = 30,
+  city = "NYC"
+}
+
+for key, value in pairs(person) do
+  print(key, value)
+end
+-- Output order is undefined
+```
+
+```lua Custom Iterator
+local function range(from, to)
+  return function(_, current)
+    if current < to then
+      return current + 1
+    end
+  end, nil, from - 1
+end
+
+for i in range(1, 5) do
+  print(i)  -- prints 1, 2, 3, 4, 5
+end
+```
+</CodeGroup>
+
+## Break Statement
+
+Exit a loop early:
+
+```lua
+for i = 1, 1000 do
+  if i == 10 then
+    break
+  end
+  print(i)
+end
+-- Prints 1 through 9
+
+-- Multiple nested loops
+for i = 1, 10 do
+  for j = 1, 10 do
+    if i * j > 20 then
+      break  -- Only breaks inner loop
+    end
+    print(i, j)
+  end
+end
+```
+
+<Warning>
+`break` only exits the innermost loop. There's no "break 2" or labeled break in Lua.
+</Warning>
+
+## Goto and Labels
+
+Lua supports `goto` for more complex control flow:
+
+### Basic Goto
+
+```lua
+::start::
+local x = 1
+print(x)
+x = x + 1
+if x <= 5 then
+  goto start
+end
+```
+
+### Skip Sections
+
+```lua
+local function process(x)
+  if x < 0 then
+    goto skip_processing
+  end
+  
+  -- Complex processing here
+  print("Processing", x)
+  
+  ::skip_processing::
+  print("Done")
+end
+
+process(10)   -- Processes
+process(-5)   -- Skips processing
+```
+
+### Break Out of Nested Loops
+
+```lua
+local found = false
+for i = 1, 10 do
+  for j = 1, 10 do
+    if i * j == 42 then
+      found = true
+      goto done
+    end
+  end
+end
+::done::
+if found then
+  print("Found it!")
+end
+```
+
+### With Closures
+
+```lua
+local a = {}
+for i = 1, 10 do
+  if i % 3 == 0 then
+    local y = 0
+    a[i] = function (x) local t = y; y = x; return t end
+  elseif i % 3 == 1 then
+    goto L1
+    error'not here'
+  ::L1::
+    local y = 1
+    a[i] = function (x) local t = y; y = x; return t end
+  else
+    local y = 2
+    a[i] = function (x) local t = y; y = x; return t end
+  end
+end
+
+for i = 1, 10 do
+  assert(a[i](i * 10) == i % 3 and a[i]() == i * 10)
+end
+```
+
+<Note>
+Goto cannot jump into the scope of a local variable, into a function, or across function boundaries.
+</Note>
+
+## Do Blocks
+
+Create explicit scopes with `do-end`:
+
+```lua
+local x = 10
+
+do
+  local x = 20  -- Different variable
+  print(x)      -- prints 20
+end
+
+print(x)        -- prints 10
+
+-- Empty blocks are valid
+do end
+;;; do ;;; end
+```
+
+## Short-Circuit Evaluation
+
+Logical operators short-circuit:
+
+```lua
+-- 'and' returns first falsy value or last value
+assert((false and error()) == false)  -- Doesn't call error()
+assert((true and 5) == 5)
+assert((nil and 5) == nil)
+
+-- 'or' returns first truthy value or last value  
+assert((true or error()) == true)     -- Doesn't call error()
+assert((false or 5) == 5)
+assert((nil or false) == false)
+
+-- Practical use
+local function getValue(optional)
+  return optional or "default"
+end
+
+assert(getValue(nil) == "default")
+assert(getValue("custom") == "custom")
+```
+
+## Complex Conditions
+
+```lua
+local function f(a, b, c, d, e)
+  local x = a >= b or c or (d and e) or nil
+  return x
+end
+
+assert(f(2, 1) == true)
+assert(f(1, 2, 'a') == 'a')
+assert(f(1, 2, nil, 1, 'x') == 'x')
+assert(f(1, 2, nil, nil, 'x') == nil)
+
+-- Testing multiple conditions
+local function test(a, b, c)
+  if not (a >= b or c or d and e or nil) then
+    return 0
+  else
+    return 1
+  end
+end
+```
+
+## Pattern: State Machines
+
+```lua
+local state = "start"
+
+while state ~= "end" do
+  if state == "start" then
+    print("Starting...")
+    state = "processing"
+  elseif state == "processing" then
+    print("Processing...")
+    state = "finishing"
+  elseif state == "finishing" then
+    print("Finishing...")
+    state = "end"
+  else
+    error("Unknown state: " .. state)
+  end
+end
+```
+
+## Pattern: Early Return
+
+```lua
+local function process(value)
+  -- Guard clauses
+  if not value then
+    return nil, "value required"
+  end
+  
+  if type(value) ~= "number" then
+    return nil, "value must be a number"
+  end
+  
+  if value < 0 then
+    return nil, "value must be positive"
+  end
+  
+  -- Main logic
+  return value * 2
+end
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Functions" icon="function" href="./functions">
+Learn about function definitions and calls
+</Card>
+
+<Card title="Tables" icon="table" href="./tables">
+Master Lua's table data structure
+</Card>
+
+<Card title="Coroutines" icon="arrows-spin" href="./coroutines">
+Understand cooperative multitasking
+</Card>
+
+<Card title="Metatables" icon="wand-magic-sparkles" href="./metatables">
+Customize table behavior with metatables
+</Card>
+</CardGroup>

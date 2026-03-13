@@ -1,0 +1,196 @@
+---
+title: Arithmetic and Comparison
+description: Functions for performing arithmetic and comparison operations
+---
+
+## Overview
+
+These functions allow you to perform arithmetic and comparison operations on Lua values from C.
+
+## Arithmetic Functions
+
+### lua_arith
+
+Performs an arithmetic or bitwise operation on values on the stack.
+
+```c
+void lua_arith(lua_State *L, int op);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="op" type="int" required>
+  The operation to perform (see constants below)
+</ParamField>
+
+**Returns:** Nothing. The result is pushed onto the stack.
+
+### Arithmetic Operators
+
+The `op` parameter can be one of the following constants:
+
+| Constant | Operation | Operands | Description |
+|----------|-----------|----------|-------------|
+| `LUA_OPADD` | `+` | 2 | Addition |
+| `LUA_OPSUB` | `-` | 2 | Subtraction |
+| `LUA_OPMUL` | `*` | 2 | Multiplication |
+| `LUA_OPDIV` | `/` | 2 | Float division |
+| `LUA_OPIDIV` | `//` | 2 | Floor division |
+| `LUA_OPMOD` | `%` | 2 | Modulo |
+| `LUA_OPPOW` | `^` | 2 | Exponentiation |
+| `LUA_OPUNM` | `-` | 1 | Unary minus |
+| `LUA_OPBNOT` | `~` | 1 | Bitwise NOT |
+| `LUA_OPBAND` | `&` | 2 | Bitwise AND |
+| `LUA_OPBOR` | `|` | 2 | Bitwise OR |
+| `LUA_OPBXOR` | `~` | 2 | Bitwise XOR |
+| `LUA_OPSHL` | `<<` | 2 | Shift left |
+| `LUA_OPSHR` | `>>` | 2 | Shift right |
+
+**Example:**
+
+```c
+// Add two numbers: result = a + b
+lua_pushnumber(L, 10.0);
+lua_pushnumber(L, 20.0);
+lua_arith(L, LUA_OPADD);
+// Stack now has: 30.0
+
+// Negate a number: result = -a
+lua_pushnumber(L, 42.0);
+lua_arith(L, LUA_OPUNM);
+// Stack now has: -42.0
+
+// Bitwise operations
+lua_pushinteger(L, 0xFF);
+lua_pushinteger(L, 0x0F);
+lua_arith(L, LUA_OPBAND);
+// Stack now has: 0x0F
+```
+
+## Comparison Functions
+
+### lua_compare
+
+Compares two Lua values.
+
+```c
+int lua_compare(lua_State *L, int idx1, int idx2, int op);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx1" type="int" required>
+  Index of the first value
+</ParamField>
+
+<ParamField path="idx2" type="int" required>
+  Index of the second value
+</ParamField>
+
+<ParamField path="op" type="int" required>
+  The comparison operation (see constants below)
+</ParamField>
+
+**Returns:** 1 if the comparison is true, 0 otherwise.
+
+### Comparison Operators
+
+The `op` parameter can be one of:
+
+| Constant | Operation | Description |
+|----------|-----------|-------------|
+| `LUA_OPEQ` | `==` | Equal to |
+| `LUA_OPLT` | `<` | Less than |
+| `LUA_OPLE` | `<=` | Less than or equal to |
+
+**Example:**
+
+```c
+lua_pushinteger(L, 10);
+lua_pushinteger(L, 20);
+
+if (lua_compare(L, -2, -1, LUA_OPLT)) {
+    printf("10 < 20 is true\n");
+}
+
+if (lua_compare(L, -2, -1, LUA_OPEQ)) {
+    printf("Values are equal\n");
+} else {
+    printf("Values are not equal\n");
+}
+```
+
+### lua_rawequal
+
+Compares two values for raw equality (without metamethods).
+
+```c
+int lua_rawequal(lua_State *L, int idx1, int idx2);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx1" type="int" required>
+  Index of the first value
+</ParamField>
+
+<ParamField path="idx2" type="int" required>
+  Index of the second value
+</ParamField>
+
+**Returns:** 1 if the values are primitively equal, 0 otherwise.
+
+**Example:**
+
+```c
+lua_pushstring(L, "hello");
+lua_pushstring(L, "hello");
+
+if (lua_rawequal(L, -2, -1)) {
+    printf("Strings are equal\n");
+}
+
+// Raw equality for tables compares identity
+lua_newtable(L);
+lua_newtable(L);
+
+if (!lua_rawequal(L, -2, -1)) {
+    printf("Different tables\n");
+}
+```
+
+## Complete Example
+
+```c
+int perform_math(lua_State *L) {
+    // Get two numbers from the stack
+    if (!lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
+        return luaL_error(L, "Expected two numbers");
+    }
+    
+    lua_Number a = lua_tonumber(L, 1);
+    lua_Number b = lua_tonumber(L, 2);
+    
+    // Perform addition
+    lua_pushvalue(L, 1);
+    lua_pushvalue(L, 2);
+    lua_arith(L, LUA_OPADD);
+    lua_Number sum = lua_tonumber(L, -1);
+    lua_pop(L, 1);
+    
+    // Check if a < b
+    if (lua_compare(L, 1, 2, LUA_OPLT)) {
+        printf("%f < %f\n", a, b);
+    }
+    
+    // Return the sum
+    lua_pushnumber(L, sum);
+    return 1;
+}
+```

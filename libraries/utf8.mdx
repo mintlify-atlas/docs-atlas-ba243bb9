@@ -1,0 +1,369 @@
+---
+title: "UTF-8 Library"
+description: "UTF-8 string manipulation"
+---
+
+The UTF-8 library provides functions for manipulating UTF-8 encoded strings. Unlike the string library which operates on bytes, this library operates on Unicode code points.
+
+## UTF-8 Functions
+
+<CardGroup cols={2}>
+  <Card title="Encoding">
+    `char` - Create UTF-8 strings
+  </Card>
+  <Card title="Decoding">
+    `codepoint` - Extract code points
+  </Card>
+  <Card title="Iteration">
+    `codes` - Iterate over characters
+  </Card>
+  <Card title="Positioning">
+    `offset`, `len` - Navigate strings
+  </Card>
+</CardGroup>
+
+### utf8.char
+
+Converts Unicode code points to a UTF-8 string.
+
+<ParamField path="···" type="integer" required>
+  Unicode code points
+</ParamField>
+
+<ResponseField name="s" type="string">
+  UTF-8 encoded string
+</ResponseField>
+
+```lua
+utf8.char(72, 101, 108, 108, 111)  -- "Hello"
+utf8.char(0x1F600)                  -- "😀" (grinning face emoji)
+utf8.char(0x4E2D, 0x6587)           -- "中文" (Chinese characters)
+```
+
+### utf8.codepoint
+
+Returns the code points of characters in a string.
+
+<ParamField path="s" type="string" required>
+  UTF-8 string
+</ParamField>
+
+<ParamField path="i" type="integer">
+  Start position (default: 1)
+</ParamField>
+
+<ParamField path="j" type="integer">
+  End position (default: i)
+</ParamField>
+
+<ParamField path="lax" type="boolean">
+  If true, allow invalid UTF-8
+</ParamField>
+
+<ResponseField name="···" type="integer">
+  Unicode code points
+</ResponseField>
+
+```lua
+utf8.codepoint("Hello", 1, 1)      -- 72 (H)
+utf8.codepoint("Hello", 1, 5)      -- 72, 101, 108, 108, 111
+utf8.codepoint("😀", 1, 1)        -- 128512 (grinning face)
+```
+
+### utf8.codes
+
+Returns an iterator for UTF-8 characters.
+
+<ParamField path="s" type="string" required>
+  UTF-8 string
+</ParamField>
+
+<ParamField path="lax" type="boolean">
+  If true, allow invalid UTF-8
+</ParamField>
+
+<ResponseField name="iterator" type="function">
+  Iterator function returning position and code point
+</ResponseField>
+
+```lua
+for pos, codepoint in utf8.codes("Hello 😀") do
+  print(pos, codepoint)
+end
+-- Output:
+-- 1    72    (H)
+-- 2    101   (e)
+-- 3    108   (l)
+-- 4    108   (l)
+-- 5    111   (o)
+-- 6    32    (space)
+-- 7    128512 (😀)
+
+-- Convert to character
+for p, c in utf8.codes("Hello") do
+  print(utf8.char(c))
+end
+```
+
+### utf8.len
+
+Returns the number of UTF-8 characters in a string.
+
+<ParamField path="s" type="string" required>
+  UTF-8 string
+</ParamField>
+
+<ParamField path="i" type="integer">
+  Start position (default: 1)
+</ParamField>
+
+<ParamField path="j" type="integer">
+  End position (default: -1)
+</ParamField>
+
+<ParamField path="lax" type="boolean">
+  If true, allow invalid UTF-8
+</ParamField>
+
+<ResponseField name="count" type="integer | nil">
+  Number of characters or nil if invalid UTF-8
+</ResponseField>
+
+<ResponseField name="pos" type="integer">
+  Position of first invalid byte (if string is invalid)
+</ResponseField>
+
+```lua
+utf8.len("Hello")        -- 5
+utf8.len("中文")          -- 2 (two Chinese characters)
+utf8.len("😀😁")        -- 2 (two emojis)
+
+-- With range
+utf8.len("Hello World", 1, 5)  -- 5
+
+-- Check for invalid UTF-8
+local len, pos = utf8.len("\x80\x81")  -- nil, 1
+if not len then
+  print("Invalid UTF-8 at position", pos)
+end
+```
+
+### utf8.offset
+
+Returns the position of the n-th character.
+
+<ParamField path="s" type="string" required>
+  UTF-8 string
+</ParamField>
+
+<ParamField path="n" type="integer" required>
+  Character index (negative counts from position i)
+</ParamField>
+
+<ParamField path="i" type="integer">
+  Start position (default: 1 for positive n, #s+1 for negative n)
+</ParamField>
+
+<ResponseField name="start" type="integer | nil">
+  Start position of the character
+</ResponseField>
+
+<ResponseField name="end" type="integer">
+  End position of the character
+</ResponseField>
+
+```lua
+local s = "Hello 中文"
+utf8.offset(s, 1)        -- 1, 1 (H)
+utf8.offset(s, 2)        -- 2, 2 (e)
+utf8.offset(s, 7)        -- 7, 9 (中 - 3 bytes)
+utf8.offset(s, 8)        -- 10, 12 (文 - 3 bytes)
+
+-- Find start of current character
+local s = "😀"
+local pos = utf8.offset(s, 0, 2)  -- Find start from position 2
+print(pos)  -- 1 (emoji starts at byte 1)
+
+-- Navigate backwards
+local s = "abc"
+utf8.offset(s, -1)  -- 3 (last char)
+utf8.offset(s, -2)  -- 2 (second to last)
+```
+
+### utf8.charpattern
+
+A pattern that matches exactly one UTF-8 character.
+
+<ResponseField name="pattern" type="string">
+  Pattern string for matching UTF-8 characters
+</ResponseField>
+
+```lua
+local s = "Hello 中文"
+for char in s:gmatch(utf8.charpattern) do
+  print(char)
+end
+-- Output: H, e, l, l, o, (space), 中, 文
+
+-- Count characters
+local count = 0
+for _ in s:gmatch(utf8.charpattern) do
+  count = count + 1
+end
+print(count)  -- 8
+```
+
+## Usage Examples
+
+### Character Iteration
+
+```lua
+local function iterateChars(s)
+  for pos, codepoint in utf8.codes(s) do
+    local char = utf8.char(codepoint)
+    print(string.format("Position %d: %s (U+%04X)", pos, char, codepoint))
+  end
+end
+
+iterateChars("Hello 😀")
+```
+
+### String Reversal
+
+```lua
+local function reverseUTF8(s)
+  local chars = {}
+  for p, c in utf8.codes(s) do
+    table.insert(chars, 1, utf8.char(c))
+  end
+  return table.concat(chars)
+end
+
+print(reverseUTF8("Hello"))    -- "olleH"
+print(reverseUTF8("中文"))      -- "文中"
+```
+
+### Substring Extraction
+
+```lua
+local function utf8sub(s, i, j)
+  local len = utf8.len(s)
+  if not len then return nil, "Invalid UTF-8" end
+  
+  i = i or 1
+  j = j or len
+  
+  if i < 0 then i = len + i + 1 end
+  if j < 0 then j = len + j + 1 end
+  
+  if i < 1 then i = 1 end
+  if j > len then j = len end
+  if i > j then return "" end
+  
+  local start = utf8.offset(s, i)
+  local finish = utf8.offset(s, j + 1)
+  
+  if not finish then
+    finish = #s + 1
+  end
+  
+  return s:sub(start, finish - 1)
+end
+
+print(utf8sub("中文测试", 2, 3))  -- "文测"
+```
+
+### Character Validation
+
+```lua
+local function isValidUTF8(s)
+  local len, pos = utf8.len(s)
+  if len then
+    return true
+  else
+    return false, "Invalid UTF-8 at byte " .. pos
+  end
+end
+
+local ok, err = isValidUTF8("Hello 😀")
+print(ok)  -- true
+
+local ok, err = isValidUTF8("\x80\x81")
+print(ok, err)  -- false, Invalid UTF-8 at byte 1
+```
+
+### Case Conversion (Simple)
+
+```lua
+-- Note: This only works for ASCII
+-- Full Unicode case conversion requires additional libraries
+local function upperUTF8(s)
+  local result = {}
+  for p, c in utf8.codes(s) do
+    if c >= 97 and c <= 122 then  -- a-z
+      c = c - 32  -- Convert to uppercase
+    end
+    table.insert(result, utf8.char(c))
+  end
+  return table.concat(result)
+end
+
+print(upperUTF8("hello"))  -- "HELLO"
+```
+
+### Character Filtering
+
+```lua
+local function filterChars(s, predicate)
+  local result = {}
+  for p, c in utf8.codes(s) do
+    if predicate(c) then
+      table.insert(result, utf8.char(c))
+    end
+  end
+  return table.concat(result)
+end
+
+-- Keep only ASCII characters
+local ascii = filterChars("Hello 中文 World", function(c)
+  return c < 128
+end)
+print(ascii)  -- "Hello  World"
+
+-- Remove spaces
+local nospace = filterChars("Hello World", function(c)
+  return c ~= 32
+end)
+print(nospace)  -- "HelloWorld"
+```
+
+### Character Counting by Category
+
+```lua
+local function countCategories(s)
+  local ascii = 0
+  local unicode = 0
+  local emoji = 0
+  
+  for p, c in utf8.codes(s) do
+    if c < 128 then
+      ascii = ascii + 1
+    elseif c >= 0x1F300 and c <= 0x1F9FF then
+      emoji = emoji + 1
+    else
+      unicode = unicode + 1
+    end
+  end
+  
+  return {
+    ascii = ascii,
+    unicode = unicode,
+    emoji = emoji,
+    total = ascii + unicode + emoji
+  }
+end
+
+local counts = countCategories("Hello 中文 😀")
+print(string.format("ASCII: %d, Unicode: %d, Emoji: %d",
+  counts.ascii, counts.unicode, counts.emoji))
+```

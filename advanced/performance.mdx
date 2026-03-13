@@ -1,0 +1,430 @@
+---
+title: Performance Optimization
+description: Techniques and best practices for optimizing Lua performance
+---
+
+## Overview
+
+Lua is designed to be fast and lightweight, but understanding its internals can help you write more efficient code. This guide covers performance optimization techniques from the VM level to application design.
+
+## Memory Layout and Cache Efficiency
+
+### Table Implementation
+
+Lua tables use a hybrid structure with both array and hash parts. Understanding this helps optimize table usage:
+
+```lua
+-- Efficient: consecutive integer keys use array part
+local t = {}
+for i = 1, 100 do
+  t[i] = i * 2
+end
+
+-- Less efficient: sparse keys force hash part usage
+local t = {}
+t[1] = "a"
+t[1000] = "b"  -- Creates large or hash-based storage
+```
+
+<Tip>
+Use consecutive integer keys starting from 1 when possible. This uses the compact array part and provides O(1) access with better cache locality.
+</Tip>
+
+### String Interning
+
+Lua interns all strings, meaning identical strings share the same memory:
+
+```lua
+local s1 = "hello"
+local s2 = "hello"
+-- s1 and s2 point to the same string in memory
+-- String comparison is O(1) pointer comparison
+```
+
+This makes string keys in tables very efficient:
+
+```lua
+-- Efficient lookups
+local t = {name = "John", age = 30}
+local n = t.name  -- Fast hash lookup
+```
+
+## Function Call Overhead
+
+### Tail Calls
+
+Lua optimizes tail calls to avoid stack growth:
+
+```lua
+-- Tail call: no stack growth
+local function factorial(n, acc)
+  if n <= 1 then return acc end
+  return factorial(n - 1, n * acc)  -- Tail position
+end
+
+-- Not a tail call: stack grows  
+local function factorial_bad(n)
+  if n <= 1 then return 1 end
+  return n * factorial_bad(n - 1)  -- Not in tail position
+end
+```
+
+<Note>
+A call is in tail position when it's the last action in a function. Arithmetic operations or concatenation after the call prevent tail call optimization.
+</Note>
+
+### Local Functions
+
+Local function calls are slightly faster than global ones:
+
+```lua
+-- Slower: global lookup on every call
+function slow()
+  for i = 1, 1000000 do
+    math.sin(i)
+  end
+end
+
+-- Faster: local reference
+local sin = math.sin
+function fast()
+  for i = 1, 1000000 do
+    sin(i)
+  end  
+end
+```
+
+## Loop Optimization
+
+### Minimize Work in Loop Bodies
+
+```lua
+-- Inefficient: recalculates length every iteration
+for i = 1, #t do
+  process(t[i])
+end
+
+-- Better: calculate length once
+local n = #t
+for i = 1, n do
+  process(t[i])
+end
+
+-- Best for arrays: use ipairs or numeric loop
+for i = 1, #t do
+  process(t[i])
+end
+```
+
+### Iterator Performance
+
+```lua
+-- Slower: generic iteration with closures
+for k, v in pairs(t) do
+  process(v)
+end
+
+-- Faster for array part: numeric iteration
+for i = 1, #t do
+  process(t[i])
+end
+```
+
+## Garbage Collection Tuning
+
+### Understanding GC Behavior
+
+From `lgc.h:191`, the default GC parameters are:
+
+```c
+#define LUAI_GCPAUSE    250   /* Wait 250% growth before starting */
+#define LUAI_GCMUL      200   /* 200% work multiplier */
+#define LUAI_GCSTEPSIZE (200 * sizeof(Table))
+```
+
+### Tuning for Allocation-Heavy Code
+
+```lua
+-- For code that allocates lots of short-lived objects
+collectgarbage("generational")  -- Use generational mode
+collectgarbage("setpause", 200)  -- More frequent collections
+collectgarbage("setstepmul", 200)  -- Default work rate
+```
+
+### Tuning for Low-Latency Applications
+
+```lua
+-- For real-time or interactive applications
+collectgarbage("incremental")  -- Use incremental mode
+collectgarbage("setpause", 500)  -- Less frequent collections
+collectgarbage("setstepmul", 400)  -- Faster cycle completion
+```
+
+### Manual Collection Control
+
+```lua
+-- Stop automatic collection
+collectgarbage("stop")
+
+-- Do work that generates garbage
+for i = 1, 1000 do
+  local temp = create_temporary_objects()
+  process(temp)
+end
+
+-- Manual collection at opportune time
+collectgarbage("collect")
+
+-- Restart automatic collection
+collectgarbage("restart")
+```
+
+<Tip>
+For batch processing or game frames, consider stopping the GC during processing and running a full collection between batches/frames.
+</Tip>
+
+## Table Optimization
+
+### Pre-sizing Tables
+
+```lua
+-- Creates table with pre-allocated space
+local t = table.create(1000)  -- If available (LuaJIT)
+
+-- Or gradually build capacity
+local t = {}
+for i = 1, 1000 do
+  t[i] = 0  -- Grows capacity as needed
+end
+```
+
+### Avoiding Table Resizing
+
+```lua
+-- Bad: triggers multiple resizes
+local t = {}
+for i = 1, 1000 do
+  t[i] = i
+end
+
+-- Better: use table literals for small sizes
+local t = {1, 2, 3, 4, 5}
+
+-- Best for large tables: build incrementally or use table.move
+```
+
+### Reusing Tables
+
+```lua
+-- Instead of creating new tables
+local function process_data(input)
+  local result = {}  -- Allocates on every call
+  -- process into result
+  return result
+end
+
+-- Reuse a table
+local temp = {}
+local function process_data_fast(input, result)
+  result = result or temp
+  for k in pairs(result) do result[k] = nil end  -- Clear
+  -- process into result
+  return result
+end
+```
+
+## String Operations
+
+### Avoid String Concatenation in Loops
+
+```lua
+-- Inefficient: creates many temporary strings
+local s = ""
+for i = 1, 1000 do
+  s = s .. tostring(i) .. ","
+end
+
+-- Efficient: use table.concat
+local parts = {}
+for i = 1, 1000 do
+  parts[i] = tostring(i)
+end
+local s = table.concat(parts, ",")
+```
+
+### String Buffer Pattern
+
+```lua
+local function build_string(data)
+  local buffer = {}
+  local n = 0
+  
+  for _, item in ipairs(data) do
+    n = n + 1
+    buffer[n] = tostring(item)
+  end
+  
+  return table.concat(buffer)
+end
+```
+
+## Number Operations
+
+### Integer vs Float
+
+Lua 5.3+ distinguishes integers and floats:
+
+```lua
+-- Integer operations are generally faster
+local a = 10      -- Integer
+local b = 5       -- Integer 
+local c = a + b   -- Integer result, fast
+
+-- Mixing triggers conversion
+local d = 10.5    -- Float
+local e = a + d   -- Float result, slower
+```
+
+### Bitwise Operations
+
+```lua
+-- Fast bitwise operations (Lua 5.3+)
+local flags = 0
+flags = flags | 0x01  -- Set bit
+if flags & 0x01 ~= 0 then  -- Test bit
+  -- ...
+end
+```
+
+## Compilation and Bytecode
+
+### Precompiling Lua Code
+
+```bash
+# Compile Lua source to bytecode
+luac -o output.luac input.lua
+
+# Bytecode loads faster (skips parsing)
+lua output.luac
+```
+
+In embedded applications:
+
+```c
+/* Load precompiled bytecode */
+if (luaL_loadfile(L, "script.luac") != LUA_OK) {
+  fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+  return -1;
+}
+```
+
+## C API Performance
+
+### Minimize Stack Operations
+
+```c
+/* Inefficient: multiple stack operations */
+for (int i = 0; i < 1000; i++) {
+  lua_getglobal(L, "process");
+  lua_pushnumber(L, i);
+  lua_call(L, 1, 0);
+}
+
+/* Better: reuse function on stack */
+lua_getglobal(L, "process");
+for (int i = 0; i < 1000; i++) {
+  lua_pushvalue(L, -1);  /* Copy function */
+  lua_pushnumber(L, i);
+  lua_call(L, 1, 0);
+}
+lua_pop(L, 1);  /* Remove function */
+```
+
+### Use Raw Operations When Safe
+
+```c
+/* With metamethods: slower */
+lua_gettable(L, -2);
+lua_settable(L, -3);
+
+/* Without metamethods: faster */
+lua_rawgeti(L, -2, index);
+lua_rawseti(L, -3, index);
+```
+
+## Profiling and Measurement
+
+### Built-in Profiling
+
+```lua
+local function profile(func, ...)
+  local start = os.clock()
+  local result = {func(...)}
+  local elapsed = os.clock() - start
+  print(string.format("Elapsed: %.6f seconds", elapsed))
+  return table.unpack(result)
+end
+
+profile(expensive_function, arg1, arg2)
+```
+
+### Debug Hooks for Profiling
+
+```lua
+local profile = {}
+
+local function hook(event)
+  if event == "call" then
+    local info = debug.getinfo(2, "nS")
+    local name = info.name or "anonymous"
+    profile[name] = (profile[name] or 0) + 1
+  end
+end
+
+debug.sethook(hook, "c")
+-- Run code to profile
+debug.sethook()  -- Disable hook
+
+-- Print results
+for name, count in pairs(profile) do
+  print(name, count)
+end
+```
+
+## Optimization Checklist
+
+- [ ] Use local variables instead of globals
+- [ ] Cache table lookups in locals
+- [ ] Prefer numeric for loops over iterators for arrays
+- [ ] Use `table.concat()` instead of string concatenation in loops
+- [ ] Preallocate tables when final size is known
+- [ ] Reuse tables instead of creating new ones
+- [ ] Use tail calls for recursive functions
+- [ ] Tune GC parameters for your workload
+- [ ] Consider generational mode for high allocation rates
+- [ ] Use raw table operations when metamethods aren't needed
+- [ ] Precompile Lua code to bytecode for faster loading
+- [ ] Profile before optimizing
+
+## Compiler Flags for Performance
+
+From the makefile, key optimization flags:
+
+```makefile
+CFLAGS= -Wall -O2 $(MYCFLAGS) -fno-stack-protector -fno-common -march=native
+```
+
+- `-O2`: Enable optimizations
+- `-march=native`: Optimize for current CPU architecture  
+- `-fno-stack-protector`: Remove stack protection overhead
+- `-fno-common`: Better code generation
+
+<Tip>
+For maximum performance, compile Lua with `-O3` and `-march=native`. For embedded systems, consider `-Os` for size optimization.
+</Tip>
+
+## See Also
+
+- [Garbage Collection](/advanced/garbage-collection)
+- [Memory Management](/advanced/memory-management)
+- [Building Lua](/advanced/building)

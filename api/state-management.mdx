@@ -1,0 +1,188 @@
+---
+title: State Management
+description: Functions for creating, closing, and managing Lua states
+---
+
+## Overview
+
+The state management functions allow you to create new Lua states, manage threads, and control the lifecycle of Lua execution environments.
+
+## Functions
+
+### lua_newstate
+
+Creates a new Lua state with a custom memory allocator.
+
+```c
+lua_State *lua_newstate(lua_Alloc f, void *ud, unsigned seed);
+```
+
+<ParamField path="f" type="lua_Alloc" required>
+  Memory allocation function to be used by this state
+</ParamField>
+
+<ParamField path="ud" type="void*" required>
+  User data pointer passed to the allocator function
+</ParamField>
+
+<ParamField path="seed" type="unsigned" required>
+  Random seed for the hash function
+</ParamField>
+
+**Returns:** A new Lua state, or `NULL` if it cannot create the state (due to lack of memory).
+
+**Example:**
+
+```c
+void* my_alloc(void *ud, void *ptr, size_t osize, size_t nsize) {
+    if (nsize == 0) {
+        free(ptr);
+        return NULL;
+    }
+    return realloc(ptr, nsize);
+}
+
+int main(void) {
+    lua_State *L = lua_newstate(my_alloc, NULL, 0);
+    if (L == NULL) {
+        fprintf(stderr, "Cannot create Lua state\n");
+        return 1;
+    }
+    // Use the state...
+    lua_close(L);
+    return 0;
+}
+```
+
+### lua_close
+
+Destroys all objects in the given Lua state and frees all dynamic memory.
+
+```c
+void lua_close(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state to close
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+lua_State *L = luaL_newstate();
+// ... use the state ...
+lua_close(L);
+```
+
+### lua_newthread
+
+Creates a new thread, pushes it on the stack, and returns a pointer to a `lua_State` that represents this new thread.
+
+```c
+lua_State *lua_newthread(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+**Returns:** A pointer to the new thread.
+
+**Example:**
+
+```c
+lua_State *L = luaL_newstate();
+lua_State *thread = lua_newthread(L);
+// The new thread is now on top of the stack of L
+// You can use 'thread' to run code in a separate coroutine
+```
+
+### lua_closethread
+
+Resets a thread, cleaning its call stack and closing all pending to-be-closed variables.
+
+```c
+int lua_closethread(lua_State *L, lua_State *from);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The thread to be closed
+</ParamField>
+
+<ParamField path="from" type="lua_State*">
+  The coroutine that is resetting L, or `NULL` if called from the main thread
+</ParamField>
+
+**Returns:** An error status (`LUA_OK` for no errors).
+
+**Example:**
+
+```c
+lua_State *thread = lua_newthread(L);
+// ... use the thread ...
+int status = lua_closethread(thread, L);
+if (status != LUA_OK) {
+    fprintf(stderr, "Error closing thread\n");
+}
+```
+
+### lua_atpanic
+
+Sets a new panic function and returns the old one.
+
+```c
+lua_CFunction lua_atpanic(lua_State *L, lua_CFunction panicf);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="panicf" type="lua_CFunction" required>
+  The new panic function
+</ParamField>
+
+**Returns:** The previous panic function.
+
+**Example:**
+
+```c
+int my_panic(lua_State *L) {
+    const char *msg = lua_tostring(L, -1);
+    fprintf(stderr, "PANIC: %s\n", msg);
+    return 0; // Return to Lua to abort
+}
+
+int main(void) {
+    lua_State *L = luaL_newstate();
+    lua_atpanic(L, my_panic);
+    // Now my_panic will be called on unprotected errors
+    lua_close(L);
+    return 0;
+}
+```
+
+### lua_version
+
+Returns the version number of the Lua core.
+
+```c
+lua_Number lua_version(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*">
+  The Lua state (can be `NULL`)
+</ParamField>
+
+**Returns:** The version number as a `lua_Number`.
+
+**Example:**
+
+```c
+lua_State *L = luaL_newstate();
+lua_Number version = lua_version(L);
+printf("Lua version: %.1f\n", version);
+lua_close(L);
+```

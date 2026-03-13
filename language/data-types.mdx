@@ -1,0 +1,362 @@
+---
+title: Data Types
+description: Understanding Lua's eight basic data types and their usage
+---
+
+## Overview
+
+Lua has eight basic data types:
+
+- **nil** - represents non-existence of a value
+- **boolean** - true or false
+- **number** - represents both integers and floating-point numbers
+- **string** - sequences of characters
+- **function** - executable code blocks
+- **userdata** - arbitrary C data
+- **thread** - independent threads of execution (coroutines)
+- **table** - associative arrays
+
+## Nil
+
+The `nil` type represents the absence of a value:
+
+```lua
+local x = nil
+local y  -- Variables are nil by default
+
+assert(type(nil) == 'nil')
+assert(x == nil and y == nil)
+
+-- Nil is falsy in boolean context
+if not nil then
+  print("nil is falsy")
+end
+```
+
+## Boolean
+
+Lua has two boolean values: `true` and `false`:
+
+```lua
+assert(type(true) == 'boolean')
+assert(type(false) == 'boolean')
+assert(type(1<2) == 'boolean')
+
+-- Only false and nil are falsy, everything else is truthy
+if 0 then print("0 is truthy") end
+if "" then print("empty string is truthy") end
+```
+
+<Note>
+Unlike many other languages, **0 and empty strings are truthy** in Lua!
+</Note>
+
+## Numbers
+
+Lua represents numbers as either integers or floats:
+
+### Integer Literals
+
+```lua
+local decimal = 123
+local hex = 0xFF        -- 255
+local octal = 0o10      -- 8 (Lua 5.5+)
+local binary = 0b1010   -- 10 (Lua 5.5+)
+
+assert(type(decimal) == 'number')
+assert(decimal + 1 == 124)
+```
+
+### Float Literals
+
+```lua
+local pi = 3.14159
+local scientific = 1.5e-3   -- 0.0015
+local hex_float = 0x1.2p3   -- 9.0 (hex float)
+
+assert(type(pi) == 'number')
+```
+
+### Number Operations
+
+<CodeGroup>
+```lua Arithmetic
+local a, b = 10, 3
+
+assert(a + b == 13)
+assert(a - b == 7)
+assert(a * b == 30)
+assert(a / b == 10/3)   -- Float division
+assert(a // b == 3)     -- Floor division
+assert(a % b == 1)      -- Modulo
+assert(a ^ b == 1000)   -- Exponentiation
+```
+
+```lua Integer vs Float
+local math = require("math")
+
+-- Check if number is integer or float
+assert(math.type(3) == "integer")
+assert(math.type(3.0) == "float")
+assert(math.type(3.5) == "float")
+
+-- Convert between types
+local x = math.floor(3.7)   -- 3 (integer)
+local y = math.ceil(3.2)    -- 4 (integer)
+```
+</CodeGroup>
+
+### Special Values
+
+```lua
+local inf = math.huge
+local neg_inf = -math.huge
+local nan = 0/0
+
+assert(inf > 0)
+assert(neg_inf < 0)
+assert(nan ~= nan)  -- NaN is not equal to itself
+```
+
+## Strings
+
+Strings are immutable sequences of bytes:
+
+### String Literals
+
+<Tabs>
+<Tab title="Single/Double Quotes">
+```lua
+local str1 = 'Hello, World!'
+local str2 = "Hello, World!"
+local str3 = 'It\'s a string with "quotes"'
+
+assert(str1 == str2)
+assert(type(str1) == 'string')
+```
+</Tab>
+
+<Tab title="Long Strings">
+```lua
+local long_string = [[
+This is a long string
+that spans multiple lines
+and preserves whitespace
+]]
+
+-- With level markers
+local nested = [=[
+This can contain [[ and ]] inside
+]=]
+```
+</Tab>
+</Tabs>
+
+### Escape Sequences
+
+```lua
+local escaped = "Line 1\nLine 2\tTabbed"
+local nulls = "a\0b\0c"  -- String with null bytes
+
+-- Common escape sequences
+assert('\n"\'\\\\ == [[
+
+"'\]])
+
+-- Decimal escapes
+assert("\099" == 'c')      -- \099 = ASCII 99 = 'c'
+assert("\099\110" == 'cn')
+
+-- Hexadecimal escapes
+assert("\x48\x65\x6C\x6C\x6F" == "Hello")
+```
+
+### UTF-8 Escapes
+
+```lua
+-- Unicode characters using \u{}
+local emoji = "\u{1F600}"  -- 😀
+local text = "\u{48}\u{65}\u{6C}\u{6C}\u{6F}"  -- "Hello"
+
+-- Limits for different byte sequences
+assert("\u{0}\u{7F}" == "\x00\x7F")           -- 1-byte
+assert("\u{80}\u{7FF}" == "\xC2\x80\xDF\xBF") -- 2-byte
+```
+
+### Line Continuation
+
+```lua
+-- Use \z to skip whitespace
+local str = "abc\z
+  def\z
+  ghi"
+
+assert(str == 'abcdefghi')
+```
+
+### String Operations
+
+```lua
+-- Concatenation
+local greeting = "Hello" .. " " .. "World"
+assert(greeting == "Hello World")
+
+-- Length
+assert(#"Hello" == 5)
+assert(string.len("Hello") == 5)
+
+-- String library functions
+assert(string.upper("hello") == "HELLO")
+assert(string.lower("HELLO") == "hello")
+assert(string.sub("Hello", 1, 4) == "Hell")
+```
+
+## Functions
+
+Functions are first-class values in Lua:
+
+```lua
+assert(type(print) == 'function')
+assert(type(assert) == type(print))
+
+-- Functions can be stored in variables
+local function greet(name)
+  return "Hello, " .. name
+end
+
+assert(type(greet) == 'function')
+
+-- Anonymous functions
+local square = function(x) return x * x end
+assert(square(5) == 25)
+```
+
+<Note>
+See the [Functions](/language/functions) guide for comprehensive coverage of function features.
+</Note>
+
+## Tables
+
+Tables are Lua's only data structuring mechanism:
+
+```lua
+assert(type({}) == 'table')
+
+-- Array-style
+local array = {10, 20, 30}
+assert(array[1] == 10)  -- Arrays are 1-indexed!
+
+-- Dictionary-style
+local person = {
+  name = "Alice",
+  age = 30
+}
+assert(person.name == "Alice")
+assert(person["age"] == 30)
+
+-- Mixed
+local mixed = {
+  10, 20, 30,
+  x = "hello",
+  y = "world"
+}
+assert(mixed[1] == 10)
+assert(mixed.x == "hello")
+```
+
+<Note>
+See the [Tables](/language/tables) guide for comprehensive coverage of table features.
+</Note>
+
+## Type Conversions
+
+### Automatic Conversions
+
+<Tabs>
+<Tab title="Number to String">
+```lua
+-- Numbers are automatically converted to strings in concatenation
+local str = "The answer is " .. 42
+assert(str == "The answer is 42")
+
+-- Explicit conversion
+local num_str = tostring(123)
+assert(type(num_str) == "string")
+```
+</Tab>
+
+<Tab title="String to Number">
+```lua
+-- Strings can be converted to numbers in arithmetic operations
+local result = "10" + "20"
+assert(result == 30)
+
+-- Explicit conversion
+local num = tonumber("123")
+assert(type(num) == "number")
+assert(num == 123)
+
+-- Handles different bases
+assert(tonumber("FF", 16) == 255)
+assert(tonumber("1010", 2) == 10)
+```
+</Tab>
+</Tabs>
+
+### Conversion Failures
+
+```lua
+-- tonumber returns nil if conversion fails
+assert(tonumber("abc") == nil)
+assert(tonumber("123abc") == nil)
+
+-- But arithmetic operations will raise an error
+local success = pcall(function()
+  return "abc" + 10  -- Error!
+end)
+assert(not success)
+```
+
+## Type Checking Utilities
+
+```lua
+-- Check type
+local function checkType(value, expectedType)
+  if type(value) ~= expectedType then
+    error("Expected " .. expectedType .. ", got " .. type(value))
+  end
+end
+
+checkType(42, "number")      -- OK
+-- checkType("hello", "number")  -- Error!
+
+-- Check for nil
+local function isNil(value)
+  return value == nil
+end
+
+-- Check for table
+local function isTable(value)
+  return type(value) == "table"
+end
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Control Flow" icon="code-branch" href="./control-flow">
+Learn about conditional statements and loops
+</Card>
+
+<Card title="Tables" icon="table" href="./tables">
+Dive deep into Lua's table data structure
+</Card>
+
+<Card title="Functions" icon="function" href="./functions">
+Master function definition and usage
+</Card>
+
+<Card title="Strings" icon="text" href="https://www.lua.org/manual/5.4/manual.html#6.4">
+Explore the string library (External)
+</Card>
+</CardGroup>

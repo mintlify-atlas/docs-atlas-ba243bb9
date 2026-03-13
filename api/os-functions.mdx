@@ -1,0 +1,472 @@
+---
+title: 'OS Functions'
+description: 'Operating system facilities including time, date, and system operations'
+---
+
+The os library provides operating system facilities such as date/time operations, environment variables, and file system operations.
+
+## Time and Date
+
+<Accordion title="os.time">
+Returns the current time or calculates time from a table.
+
+```lua
+os.time([table])
+```
+
+**Table fields:** year, month, day, hour (12), min (0), sec (0), isdst
+
+**Returns:** Time as a number (seconds since epoch)
+
+**Example:**
+```lua
+-- Current time
+local now = os.time()
+print(now)  -- 1710345678
+
+-- Specific time
+local t = os.time{year=2024, month=3, day=15}
+print(t)
+
+-- Full date specification
+local t = os.time{
+  year = 2024,
+  month = 3,
+  day = 15,
+  hour = 14,
+  min = 30,
+  sec = 0
+}
+```
+</Accordion>
+
+<Accordion title="os.date">
+Formats a date/time value.
+
+```lua
+os.date([format [, time]])
+```
+
+**Special formats:**
+- `"*t"` - Returns table
+- `"!*t"` - Returns UTC table
+- Other: strftime format string
+
+**Format specifiers:**
+- `%Y` - Year (4 digits)
+- `%m` - Month (01-12)
+- `%d` - Day (01-31)
+- `%H` - Hour (00-23)
+- `%M` - Minute (00-59)
+- `%S` - Second (00-59)
+- `%w` - Weekday (0-6, Sunday=0)
+- `%j` - Day of year (001-366)
+- `%a` - Abbreviated weekday name
+- `%A` - Full weekday name
+- `%b` - Abbreviated month name
+- `%B` - Full month name
+
+**Example:**
+```lua
+-- Format current date/time
+print(os.date("%Y-%m-%d %H:%M:%S"))  -- "2024-03-15 14:30:00"
+print(os.date("%A, %B %d, %Y"))     -- "Friday, March 15, 2024"
+print(os.date("%x %X"))              -- Locale format
+
+-- Get date table
+local t = os.date("*t")
+print(t.year, t.month, t.day)  -- 2024  3  15
+print(t.hour, t.min, t.sec)    -- 14  30  0
+print(t.wday, t.yday)          -- 6  75
+print(t.isdst)                 -- false
+
+-- UTC time
+local utc = os.date("!*t")
+
+-- Format specific time
+local t = os.time{year=2024, month=12, day=25}
+print(os.date("%A", t))  -- "Wednesday"
+```
+</Accordion>
+
+<Accordion title="os.difftime">
+Returns the difference between two times.
+
+```lua
+os.difftime(t2, t1)
+```
+
+**Returns:** Difference in seconds
+
+**Example:**
+```lua
+local start = os.time()
+-- ... do something ...
+local finish = os.time()
+local elapsed = os.difftime(finish, start)
+print(string.format("Elapsed: %.2f seconds", elapsed))
+
+-- Days between dates
+local date1 = os.time{year=2024, month=1, day=1}
+local date2 = os.time{year=2024, month=12, day=31}
+local days = os.difftime(date2, date1) / (24 * 60 * 60)
+print(string.format("Days: %.0f", days))  -- 365
+```
+</Accordion>
+
+<Accordion title="os.clock">
+Returns CPU time used by the program.
+
+```lua
+os.clock()
+```
+
+**Returns:** CPU time in seconds
+
+**Example:**
+```lua
+local start = os.clock()
+for i = 1, 1000000 do
+  -- CPU-intensive work
+end
+local elapsed = os.clock() - start
+print(string.format("CPU time: %.3f seconds", elapsed))
+```
+</Accordion>
+
+## Environment
+
+<Accordion title="os.getenv">
+Gets an environment variable.
+
+```lua
+os.getenv(varname)
+```
+
+**Returns:** Value or nil
+
+**Example:**
+```lua
+local home = os.getenv("HOME")
+print("Home directory:", home)
+
+local path = os.getenv("PATH")
+if path then
+  for dir in path:gmatch("[^:]+") do
+    print(dir)
+  end
+end
+
+local user = os.getenv("USER") or os.getenv("USERNAME")
+print("User:", user)
+```
+</Accordion>
+
+## File System
+
+<Accordion title="os.remove">
+Deletes a file or empty directory.
+
+```lua
+os.remove(filename)
+```
+
+**Returns:** true or nil + error message
+
+**Example:**
+```lua
+-- Remove file
+local success, err = os.remove("temp.txt")
+if success then
+  print("File deleted")
+else
+  print("Error:", err)
+end
+
+-- Remove directory (must be empty)
+os.remove("old_dir")
+```
+</Accordion>
+
+<Accordion title="os.rename">
+Renames a file or directory.
+
+```lua
+os.rename(oldname, newname)
+```
+
+**Returns:** true or nil + error message
+
+**Example:**
+```lua
+-- Rename file
+local success = os.rename("old.txt", "new.txt")
+if success then
+  print("File renamed")
+end
+
+-- Move file (if in same filesystem)
+os.rename("file.txt", "backup/file.txt")
+```
+</Accordion>
+
+<Accordion title="os.tmpname">
+Generates a temporary file name.
+
+```lua
+os.tmpname()
+```
+
+**Returns:** Unique temporary file name
+
+**Example:**
+```lua
+local tempfile = os.tmpname()
+print("Temp file:", tempfile)
+
+local f = io.open(tempfile, "w")
+f:write("temporary data")
+f:close()
+
+-- Clean up
+os.remove(tempfile)
+```
+</Accordion>
+
+## Program Control
+
+<Accordion title="os.execute">
+Executes a system command.
+
+```lua
+os.execute([command])
+```
+
+**Returns:** true/nil, exit type, exit code
+
+**Example:**
+```lua
+-- Check if shell is available
+if os.execute() then
+  print("Shell available")
+end
+
+-- Run command
+local success = os.execute("ls -l")
+if success then
+  print("Command succeeded")
+end
+
+-- Get exit code
+local ok, exit, code = os.execute("grep pattern file.txt")
+print(ok, exit, code)
+
+-- Run multiple commands
+os.execute("mkdir -p backup && cp *.txt backup/")
+```
+</Accordion>
+
+<Accordion title="os.exit">
+Terminates the program.
+
+```lua
+os.exit([code [, close]])
+```
+
+**Parameters:**
+- `code` - Exit code (true=0, false=1, or number)
+- `close` - Whether to close Lua state
+
+**Example:**
+```lua
+-- Exit with success
+os.exit(0)
+os.exit(true)
+
+-- Exit with error
+os.exit(1)
+os.exit(false)
+
+-- Exit with custom code
+os.exit(42)
+
+-- Exit and close Lua
+os.exit(0, true)
+```
+</Accordion>
+
+## Locale
+
+<Accordion title="os.setlocale">
+Sets the current locale.
+
+```lua
+os.setlocale(locale [, category])
+```
+
+**Categories:**
+- `"all"` - All (default)
+- `"collate"` - Collation
+- `"ctype"` - Character types
+- `"monetary"` - Monetary formatting
+- `"numeric"` - Numeric formatting
+- `"time"` - Time formatting
+
+**Returns:** Locale name or nil
+
+**Example:**
+```lua
+-- Get current locale
+local current = os.setlocale()
+print("Current locale:", current)
+
+-- Set to native locale
+os.setlocale("")
+
+-- Set specific locale
+os.setlocale("en_US.UTF-8")
+os.setlocale("C")  -- Standard C locale
+
+-- Set category
+os.setlocale("de_DE", "monetary")
+```
+</Accordion>
+
+## Practical Examples
+
+### Timing Operations
+
+```lua
+function measureTime(fn, ...)
+  local start = os.clock()
+  local results = {fn(...)}
+  local elapsed = os.clock() - start
+  return elapsed, table.unpack(results)
+end
+
+-- Usage
+local time, result = measureTime(function(n)
+  local sum = 0
+  for i = 1, n do
+    sum = sum + i
+  end
+  return sum
+end, 1000000)
+
+print(string.format("Result: %d in %.3f seconds", result, time))
+```
+
+### Date Formatting
+
+```lua
+function formatDate(time, format)
+  format = format or "%Y-%m-%d %H:%M:%S"
+  return os.date(format, time)
+end
+
+-- Relative dates
+function addDays(time, days)
+  return time + (days * 24 * 60 * 60)
+end
+
+local now = os.time()
+local tomorrow = addDays(now, 1)
+local nextWeek = addDays(now, 7)
+
+print("Today:", formatDate(now))
+print("Tomorrow:", formatDate(tomorrow))
+print("Next week:", formatDate(nextWeek))
+```
+
+### Log File with Timestamps
+
+```lua
+function log(message)
+  local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+  local entry = string.format("[%s] %s\n", timestamp, message)
+  
+  local file = io.open("app.log", "a")
+  if file then
+    file:write(entry)
+    file:close()
+  end
+end
+
+log("Application started")
+log("Processing data")
+log("Operation completed")
+```
+
+### Backup Files
+
+```lua
+function backup(filename)
+  local timestamp = os.date("%Y%m%d_%H%M%S")
+  local backup = filename .. "." .. timestamp
+  
+  local success, err = os.rename(filename, backup)
+  if success then
+    print("Backed up to:", backup)
+    return backup
+  else
+    print("Backup failed:", err)
+    return nil
+  end
+end
+
+backup("data.txt")
+-- Creates: data.txt.20240315_143000
+```
+
+### Cleanup Old Files
+
+```lua
+function isOlderThan(filename, days)
+  -- Note: This requires additional OS-specific code
+  -- to get file modification time
+  local cmd = string.format("stat -c %%Y %s", filename)
+  local handle = io.popen(cmd)
+  local mtime = tonumber(handle:read("*a"))
+  handle:close()
+  
+  if mtime then
+    local age = os.difftime(os.time(), mtime)
+    return age > (days * 24 * 60 * 60)
+  end
+  return false
+end
+
+function cleanupOldFiles(pattern, days)
+  local cmd = string.format("ls %s", pattern)
+  local handle = io.popen(cmd)
+  
+  for file in handle:lines() do
+    if isOlderThan(file, days) then
+      print("Removing old file:", file)
+      os.remove(file)
+    end
+  end
+  
+  handle:close()
+end
+
+cleanupOldFiles("*.log", 30)  -- Remove logs older than 30 days
+```
+
+### Wait/Sleep Function
+
+```lua
+function sleep(seconds)
+  local start = os.time()
+  repeat until os.time() > start + seconds
+end
+
+-- Better approach using os.execute (Unix/Linux)
+function sleep(seconds)
+  os.execute("sleep " .. tonumber(seconds))
+end
+
+print("Waiting...")
+sleep(2)
+print("Done!")
+```

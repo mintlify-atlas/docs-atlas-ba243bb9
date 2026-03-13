@@ -1,0 +1,553 @@
+---
+title: Userdata
+description: Managing C objects and pointers in Lua using userdata
+---
+
+## Overview
+
+Userdata is Lua's mechanism for representing arbitrary C data. It allows you to:
+
+- Store C structs and objects in Lua
+- Associate metatables for object-oriented behavior
+- Manage memory lifecycle with garbage collection
+- Pass opaque C pointers between C and Lua
+
+There are two types of userdata:
+
+1. **Full userdata** - Memory managed by Lua
+2. **Light userdata** - Simple C pointers
+
+## Full Userdata
+
+Full userdata is a block of raw memory allocated and managed by Lua's garbage collector.
+
+### Creating Userdata
+
+Allocate userdata with `lua_newuserdatauv()` (lapi.c:1358-1368):
+
+```c
+void *lua_newuserdatauv(lua_State *L, size_t size, int nuvalue);
+```
+
+Parameters:
+- `size`: Size in bytes
+- `nuvalue`: Number of associated user values (0-32767)
+
+Example:
+
+```c
+typedef struct {
+    int x;
+    int y;
+    char name[32];
+} Point;
+
+static int point_new(lua_State *L) {
+    // Allocate userdata
+    Point *p = (Point *)lua_newuserdata(L, sizeof(Point));
+    
+    // Initialize
+    p->x = luaL_checkinteger(L, 1);
+    p->y = luaL_checkinteger(L, 2);
+    strncpy(p->name, luaL_checkstring(L, 3), sizeof(p->name) - 1);
+    
+    // Userdata is now on stack top
+    return 1;
+}
+```
+
+The `lua_newuserdata()` macro (lua.h:436) is shorthand for `lua_newuserdatauv(L, s, 1)`.
+
+### Retrieving Userdata
+
+Get userdata from the stack:
+
+```c
+void *lua_touserdata(lua_State *L, int idx);
+```
+
+Example:
+
+```c
+static int point_get_x(lua_State *L) {
+    Point *p = (Point *)lua_touserdata(L, 1);
+    if (!p) {
+        return luaL_error(L, "expected Point");
+    }
+    lua_pushinteger(L, p->x);
+    return 1;
+}
+```
+
+<Warning>
+`lua_touserdata()` does not check the type. It returns the raw pointer or NULL if not userdata. Always validate the type!
+</Warning>
+
+## Metatables for Type Safety
+
+Use metatables to tag userdata with type information:
+
+<Steps>
+
+### Create the Metatable
+
+Create a unique metatable for your type (lauxlib.h:70):
+
+```c
+luaL_newmetatable(L, "Point");
+```
+
+This creates a new table and stores it in the registry with key "Point".
+
+### Set the Metatable
+
+Associate the metatable with userdata:
+
+```c
+static int point_new(lua_State *L) {
+    Point *p = (Point *)lua_newuserdata(L, sizeof(Point));
+    p->x = luaL_checkinteger(L, 1);
+    p->y = luaL_checkinteger(L, 2);
+    
+    // Set metatable
+    luaL_setmetatable(L, "Point");
+    return 1;
+}
+```
+
+### Check the Type
+
+Validate userdata type with `luaL_checkudata()` (lauxlib.h:73):
+
+```c
+static int point_distance(lua_State *L) {
+    // Check type and get pointer
+    Point *p = (Point *)luaL_checkudata(L, 1, "Point");
+    
+    double dist = sqrt(p->x * p->x + p->y * p->y);
+    lua_pushnumber(L, dist);
+    return 1;
+}
+```
+
+If the type doesn't match, `luaL_checkudata()` raises an error.
+
+</Steps>
+
+## Complete Example: Managed Objects
+
+```c
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+
+typedef struct {
+    double x;
+    double y;
+} Vector;
+
+// Constructor
+static int vector_new(lua_State *L) {
+    double x = luaL_optnumber(L, 1, 0.0);
+    double y = luaL_optnumber(L, 2, 0.0);
+    
+    Vector *v = (Vector *)lua_newuserdata(L, sizeof(Vector));
+    v->x = x;
+    v->y = y;
+    
+    luaL_setmetatable(L, "Vector");
+    return 1;
+}
+
+// Method: get magnitude
+static int vector_magnitude(lua_State *L) {
+    Vector *v = (Vector *)luaL_checkudata(L, 1, "Vector");
+    lua_pushnumber(L, sqrt(v->x * v->x + v->y * v->y));
+    return 1;
+}
+
+// Method: add two vectors
+static int vector_add(lua_State *L) {
+    Vector *v1 = (Vector *)luaL_checkudata(L, 1, "Vector");
+    Vector *v2 = (Vector *)luaL_checkudata(L, 2, "Vector");
+    
+    Vector *result = (Vector *)lua_newuserdata(L, sizeof(Vector));
+    result->x = v1->x + v2->x;
+    result->y = v1->y + v2->y;
+    
+    luaL_setmetatable(L, "Vector");
+    return 1;
+}
+
+// Metamethod: __tostring
+static int vector_tostring(lua_State *L) {
+    Vector *v = (Vector *)luaL_checkudata(L, 1, "Vector");
+    lua_pushfstring(L, "Vector(%.2f, %.2f)", v->x, v->y);
+    return 1;
+}
+
+// Metamethod: __gc (garbage collection)
+static int vector_gc(lua_State *L) {
+    Vector *v = (Vector *)luaL_checkudata(L, 1, "Vector");
+    printf("Collecting Vector(%.2f, %.2f)\n", v->x, v->y);
+    return 0;
+}
+
+// Method table
+static const luaL_Reg vector_methods[] = {
+    {"magnitude", vector_magnitude},
+    {"add", vector_add},
+    {NULL, NULL}
+};
+
+// Metamethods
+static const luaL_Reg vector_meta[] = {
+    {"__tostring", vector_tostring},
+    {"__gc", vector_gc},
+    {NULL, NULL}
+};
+
+// Library initialization
+int luaopen_vector(lua_State *L) {
+    // Create metatable
+    luaL_newmetatable(L, "Vector");
+    
+    // Set metamethods
+    luaL_setfuncs(L, vector_meta, 0);
+    
+    // Create __index table with methods
+    lua_newtable(L);
+    luaL_setfuncs(L, vector_methods, 0);
+    lua_setfield(L, -2, "__index");
+    
+    // Create library table
+    lua_newtable(L);
+    lua_pushcfunction(L, vector_new);
+    lua_setfield(L, -2, "new");
+    
+    return 1;
+}
+
+int main(void) {
+    lua_State *L = luaL_newstate();
+    luaL_openlibs(L);
+    
+    // Register library
+    luaL_requiref(L, "vector", luaopen_vector, 1);
+    lua_pop(L, 1);
+    
+    // Test it
+    const char *code = 
+        "local v1 = vector.new(3, 4)\n"
+        "local v2 = vector.new(1, 2)\n"
+        "print(v1)\n"
+        "print('Magnitude:', v1:magnitude())\n"
+        "local v3 = v1:add(v2)\n"
+        "print('Sum:', v3)\n";
+    
+    luaL_dostring(L, code);
+    
+    lua_close(L);
+    return 0;
+}
+```
+
+Output:
+```
+Vector(3.00, 4.00)
+Magnitude: 5.0
+Sum: Vector(4.00, 6.00)
+Collecting Vector(4.00, 6.00)
+Collecting Vector(1.00, 2.00)
+Collecting Vector(3.00, 4.00)
+```
+
+## Garbage Collection
+
+Lua automatically garbage collects userdata when no longer referenced.
+
+### The __gc Metamethod
+
+Define a finalizer to clean up resources:
+
+```c
+typedef struct {
+    FILE *file;
+    char filename[256];
+} FileHandle;
+
+static int file_gc(lua_State *L) {
+    FileHandle *fh = (FileHandle *)luaL_checkudata(L, 1, "FileHandle");
+    
+    if (fh->file) {
+        printf("Closing file: %s\n", fh->filename);
+        fclose(fh->file);
+        fh->file = NULL;
+    }
+    
+    return 0;
+}
+
+static int file_open(lua_State *L) {
+    const char *filename = luaL_checkstring(L, 1);
+    const char *mode = luaL_optstring(L, 2, "r");
+    
+    FileHandle *fh = (FileHandle *)lua_newuserdata(L, sizeof(FileHandle));
+    fh->file = fopen(filename, mode);
+    
+    if (!fh->file) {
+        return luaL_error(L, "cannot open file '%s'", filename);
+    }
+    
+    strncpy(fh->filename, filename, sizeof(fh->filename) - 1);
+    luaL_setmetatable(L, "FileHandle");
+    
+    return 1;
+}
+```
+
+<Warning>
+The `__gc` metamethod is called during garbage collection. Do not:
+- Perform long operations
+- Call back into Lua (may fail)
+- Assume specific collection order
+</Warning>
+
+## Light Userdata
+
+Light userdata is a simple C pointer, not managed by Lua's garbage collector.
+
+### Creating Light Userdata
+
+Push a pointer (lapi.c:647-652):
+
+```c
+void *ptr = &my_data;
+lua_pushlightuserdata(L, ptr);
+```
+
+### Retrieving Light Userdata
+
+```c
+void *ptr = lua_touserdata(L, index);
+```
+
+### Use Cases
+
+Light userdata is useful for:
+
+- Registry keys (guaranteed unique)
+- Temporary pointers that don't need GC
+- Callbacks with context pointers
+
+```c
+// Use pointer as unique registry key
+static int my_unique_key;
+
+void store_in_registry(lua_State *L, int index) {
+    lua_pushvalue(L, index);
+    lua_pushlightuserdata(L, &my_unique_key);
+    lua_insert(L, -2);
+    lua_settable(L, LUA_REGISTRYINDEX);
+}
+
+void get_from_registry(lua_State *L) {
+    lua_pushlightuserdata(L, &my_unique_key);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+}
+```
+
+<Warning>
+Light userdata:
+- Has no metatable
+- Is not garbage collected
+- Cannot have associated user values
+- The pointer must remain valid while in use
+</Warning>
+
+## User Values
+
+Full userdata can have associated Lua values (lua.h:271-273):
+
+```c
+void *lua_newuserdatauv(lua_State *L, size_t sz, int nuvalue);
+int lua_getiuservalue(lua_State *L, int idx, int n);
+int lua_setiuservalue(lua_State *L, int idx, int n);
+```
+
+Example:
+
+```c
+typedef struct {
+    int id;
+} Object;
+
+static int object_new(lua_State *L) {
+    int id = luaL_checkinteger(L, 1);
+    
+    // Create userdata with 2 user values
+    Object *obj = lua_newuserdatauv(L, sizeof(Object), 2);
+    obj->id = id;
+    
+    // Set user value 1: name
+    lua_pushstring(L, "unnamed");
+    lua_setiuservalue(L, -2, 1);
+    
+    // Set user value 2: properties table
+    lua_newtable(L);
+    lua_setiuservalue(L, -2, 2);
+    
+    luaL_setmetatable(L, "Object");
+    return 1;
+}
+
+static int object_getname(lua_State *L) {
+    luaL_checkudata(L, 1, "Object");
+    lua_getiuservalue(L, 1, 1);  // Get user value 1
+    return 1;
+}
+
+static int object_setname(lua_State *L) {
+    luaL_checkudata(L, 1, "Object");
+    luaL_checkstring(L, 2);
+    lua_pushvalue(L, 2);
+    lua_setiuservalue(L, 1, 1);  // Set user value 1
+    return 0;
+}
+```
+
+User values are useful for:
+- Storing Lua objects associated with C data
+- Environment tables
+- Weak references
+
+## Best Practices
+
+1. **Always use metatables** - Provides type safety and OOP
+2. **Check types with luaL_checkudata()** - Prevents crashes
+3. **Implement __gc when needed** - Clean up resources properly
+4. **Document userdata lifetime** - Make ownership clear
+5. **Use light userdata for pointers** - When GC is not needed
+6. **Initialize all fields** - Avoid undefined behavior
+7. **Check for NULL** - Handle allocation failures
+
+## Common Patterns
+
+### Pattern 1: Reference Counting
+
+```c
+typedef struct {
+    void *resource;
+    int refcount;
+} RefCounted;
+
+static int ref_acquire(lua_State *L) {
+    RefCounted *rc = luaL_checkudata(L, 1, "RefCounted");
+    rc->refcount++;
+    lua_pushvalue(L, 1);
+    return 1;
+}
+
+static int ref_release(lua_State *L) {
+    RefCounted *rc = luaL_checkudata(L, 1, "RefCounted");
+    if (--rc->refcount == 0 && rc->resource) {
+        free_resource(rc->resource);
+        rc->resource = NULL;
+    }
+    return 0;
+}
+
+static int ref_gc(lua_State *L) {
+    return ref_release(L);
+}
+```
+
+### Pattern 2: Opaque Handles
+
+```c
+typedef struct {
+    int handle_id;
+} Handle;
+
+static int handle_new(lua_State *L) {
+    Handle *h = lua_newuserdata(L, sizeof(Handle));
+    h->handle_id = create_system_handle();
+    luaL_setmetatable(L, "Handle");
+    return 1;
+}
+
+static int handle_use(lua_State *L) {
+    Handle *h = luaL_checkudata(L, 1, "Handle");
+    use_system_handle(h->handle_id);
+    return 0;
+}
+
+static int handle_gc(lua_State *L) {
+    Handle *h = luaL_checkudata(L, 1, "Handle");
+    destroy_system_handle(h->handle_id);
+    return 0;
+}
+```
+
+### Pattern 3: Subclassing
+
+```c
+typedef struct {
+    int base_field;
+} Base;
+
+typedef struct {
+    Base base;
+    int derived_field;
+} Derived;
+
+static int derived_new(lua_State *L) {
+    Derived *d = lua_newuserdata(L, sizeof(Derived));
+    d->base.base_field = luaL_checkinteger(L, 1);
+    d->derived_field = luaL_checkinteger(L, 2);
+    
+    luaL_setmetatable(L, "Derived");
+    return 1;
+}
+
+// Can cast to Base* when needed
+static int use_as_base(lua_State *L) {
+    Derived *d = luaL_checkudata(L, 1, "Derived");
+    Base *b = (Base *)d;
+    lua_pushinteger(L, b->base_field);
+    return 1;
+}
+```
+
+## Debugging Userdata
+
+Helper to inspect userdata:
+
+```c
+void dump_userdata(lua_State *L, int index) {
+    if (lua_isuserdata(L, index)) {
+        void *ptr = lua_touserdata(L, index);
+        printf("Userdata at %p\n", ptr);
+        
+        if (lua_getmetatable(L, index)) {
+            lua_getfield(L, -1, "__name");
+            if (lua_isstring(L, -1)) {
+                printf("  Type: %s\n", lua_tostring(L, -1));
+            }
+            lua_pop(L, 2);
+        }
+        
+        size_t size = lua_rawlen(L, index);
+        printf("  Size: %zu bytes\n", size);
+    }
+}
+```
+
+## Next Steps
+
+- [Registering Functions](/c-api/registering-functions) - Create methods for userdata
+- [The Stack](/c-api/stack) - Master stack-based data transfer
+- [Calling Lua](/c-api/calling-lua) - Invoke Lua methods on userdata

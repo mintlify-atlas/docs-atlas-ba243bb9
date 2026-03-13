@@ -1,0 +1,560 @@
+---
+title: Tables
+description: Master Lua's powerful and flexible table data structure
+---
+
+## Introduction
+
+Tables are Lua's only data structuring mechanism. They implement associative arrays and can represent arrays, sets, records, graphs, trees, and more.
+
+```lua
+assert(type({}) == 'table')
+
+local empty = {}
+local array = {10, 20, 30}
+local dict = {name = "Alice", age = 30}
+```
+
+## Creating Tables
+
+### Constructor Syntax
+
+<Tabs>
+<Tab title="Empty Table">
+```lua
+local t = {}
+assert(next(t) == nil)  -- Table is empty
+```
+</Tab>
+
+<Tab title="Array-Style">
+```lua
+local fruits = {"apple", "banana", "cherry"}
+assert(fruits[1] == "apple")  -- 1-indexed!
+assert(fruits[2] == "banana")
+assert(#fruits == 3)  -- Length operator
+```
+</Tab>
+
+<Tab title="Dictionary-Style">
+```lua
+local person = {
+  name = "Alice",
+  age = 30,
+  city = "NYC"
+}
+assert(person.name == "Alice")
+assert(person["age"] == 30)
+```
+</Tab>
+
+<Tab title="Mixed">
+```lua
+local mixed = {
+  10, 20, 30,        -- Array part (indices 1, 2, 3)
+  x = "hello",       -- Hash part
+  y = "world",
+  ["z"] = 42
+}
+assert(mixed[1] == 10)
+assert(mixed.x == "hello")
+assert(mixed.z == 42)
+```
+</Tab>
+</Tabs>
+
+### Computed Keys
+
+```lua
+local key = "name"
+local t = {
+  [key] = "Alice",
+  [1 + 2] = "three",
+  [string.upper("id")] = 123
+}
+
+assert(t.name == "Alice")
+assert(t[3] == "three")
+assert(t.ID == 123)
+```
+
+## Accessing Elements
+
+### Index Syntax
+
+```lua
+local t = {x = 10, y = 20}
+
+-- Dot notation (for valid identifiers)
+assert(t.x == 10)
+
+-- Bracket notation (for any key)
+assert(t["y"] == 20)
+assert(t["x"] == 10)
+
+-- With variables
+local key = "x"
+assert(t[key] == 10)
+```
+
+### Array Indexing
+
+<Warning>
+Lua arrays are **1-indexed**, not 0-indexed like many other languages!
+</Warning>
+
+```lua
+local arr = {"a", "b", "c"}
+
+assert(arr[0] == nil)   -- No element at index 0
+assert(arr[1] == "a")   -- First element
+assert(arr[2] == "b")
+assert(arr[3] == "c")
+assert(arr[4] == nil)   -- Out of bounds
+```
+
+## Modifying Tables
+
+### Setting Values
+
+```lua
+local t = {}
+
+-- Add elements
+t.name = "Alice"
+t["age"] = 30
+t[1] = "first"
+
+assert(t.name == "Alice")
+assert(t[1] == "first")
+```
+
+### Removing Values
+
+```lua
+local t = {x = 10, y = 20, z = 30}
+
+-- Set to nil to remove
+t.y = nil
+assert(t.y == nil)
+
+-- For arrays, use table.remove
+local arr = {10, 20, 30, 40}
+table.remove(arr, 2)  -- Remove element at index 2
+assert(arr[1] == 10 and arr[2] == 30 and arr[3] == 40)
+```
+
+## Table Length
+
+### Length Operator (#)
+
+```lua
+local arr = {10, 20, 30, 40, 50}
+assert(#arr == 5)
+
+-- Works for contiguous arrays
+local a = {}
+for i = 1, 100 do
+  a[i] = true
+  assert(#a == i)
+end
+```
+
+<Note>
+The length operator `#` only works reliably on arrays without holes (nil values in the sequence).
+</Note>
+
+### Arrays with Holes
+
+```lua
+-- Array with holes
+local t = {10, 20, nil, 40, 50}
+local len = #t  -- Undefined behavior! Could be 2 or 5
+
+-- Use explicit tracking instead
+local t = {n = 5, 10, 20, nil, 40, 50}
+assert(t.n == 5)  -- Explicit length
+```
+
+## Iterating Tables
+
+### ipairs (Array Part)
+
+```lua
+local fruits = {"apple", "banana", "cherry"}
+
+for i, fruit in ipairs(fruits) do
+  print(i, fruit)
+end
+-- 1  apple
+-- 2  banana
+-- 3  cherry
+```
+
+### pairs (All Elements)
+
+```lua
+local person = {
+  name = "Alice",
+  age = 30,
+  [1] = "first",
+  [2] = "second"
+}
+
+for key, value in pairs(person) do
+  print(key, value)
+end
+-- Order is undefined for hash part
+```
+
+### Manual Iteration with next()
+
+```lua
+local t = {a = 1, b = 2, c = 3}
+
+local key = nil
+while true do
+  key = next(t, key)
+  if key == nil then break end
+  print(key, t[key])
+end
+```
+
+## Table Library
+
+### Insertion
+
+<CodeGroup>
+```lua table.insert
+-- Insert at end
+local t = {10, 20, 30}
+table.insert(t, 40)
+assert(t[4] == 40)
+
+-- Insert at position
+local t = {10, 20, 30}
+table.insert(t, 2, 15)
+assert(t[2] == 15 and t[3] == 20)
+```
+
+```lua table.remove
+-- Remove from end
+local t = {10, 20, 30}
+local last = table.remove(t)
+assert(last == 30 and #t == 2)
+
+-- Remove from position
+local t = {10, 20, 30, 40}
+local removed = table.remove(t, 2)
+assert(removed == 20)
+assert(t[2] == 30)  -- Elements shift
+```
+</CodeGroup>
+
+### Concatenation
+
+```lua
+local t = {"hello", "world", "lua"}
+local str = table.concat(t, " ")
+assert(str == "hello world lua")
+
+-- With range
+local t = {"a", "b", "c", "d", "e"}
+local str = table.concat(t, "-", 2, 4)
+assert(str == "b-c-d")
+```
+
+### Sorting
+
+```lua
+-- Default sort (ascending)
+local t = {3, 1, 4, 1, 5, 9, 2, 6}
+table.sort(t)
+assert(t[1] == 1 and t[#t] == 9)
+
+-- Custom comparator
+local t = {3, 1, 4, 1, 5, 9, 2, 6}
+table.sort(t, function(a, b) return a > b end)
+assert(t[1] == 9 and t[#t] == 1)  -- Descending
+```
+
+### Packing and Unpacking
+
+<Tabs>
+<Tab title="table.pack">
+```lua
+-- Pack values into a table with count
+local t = table.pack(10, 20, 30)
+assert(t.n == 3)  -- Count of elements
+assert(t[1] == 10 and t[2] == 20 and t[3] == 30)
+
+-- Handles nil values
+local t = table.pack(1, nil, 3)
+assert(t.n == 3)
+assert(t[2] == nil)
+```
+</Tab>
+
+<Tab title="table.unpack">
+```lua
+-- Unpack table into multiple values
+local t = {10, 20, 30}
+local a, b, c = table.unpack(t)
+assert(a == 10 and b == 20 and c == 30)
+
+-- With range
+local t = {10, 20, 30, 40, 50}
+local b, c = table.unpack(t, 2, 3)
+assert(b == 20 and c == 30)
+```
+</Tab>
+</Tabs>
+
+## Multi-dimensional Tables
+
+Implement multi-dimensional arrays using nested tables:
+
+```lua
+-- Create 2D array
+local matrix = {}
+for i = 1, 3 do
+  matrix[i] = {}
+  for j = 1, 3 do
+    matrix[i][j] = i * j
+  end
+end
+
+assert(matrix[2][3] == 6)
+
+-- Using single index (manual calculation)
+local function index2d(row, col, width)
+  return (row - 1) * width + col
+end
+
+local flat = {}
+local width = 3
+for i = 1, 3 do
+  for j = 1, 3 do
+    flat[index2d(i, j, width)] = i * j
+  end
+end
+```
+
+## Tables as Sets
+
+Implement sets using tables:
+
+```lua
+local function Set(list)
+  local set = {}
+  for _, value in ipairs(list) do
+    set[value] = true
+  end
+  return set
+end
+
+local set = Set{"apple", "banana", "cherry"}
+
+-- Check membership
+assert(set["apple"] == true)
+assert(set["orange"] == nil)
+
+-- Set operations
+local function union(a, b)
+  local result = {}
+  for k in pairs(a) do result[k] = true end
+  for k in pairs(b) do result[k] = true end
+  return result
+end
+
+local function intersection(a, b)
+  local result = {}
+  for k in pairs(a) do
+    if b[k] then result[k] = true end
+  end
+  return result
+end
+```
+
+## Tables as Stacks and Queues
+
+### Stack (LIFO)
+
+```lua
+local stack = {}
+
+-- Push
+table.insert(stack, "first")
+table.insert(stack, "second")
+table.insert(stack, "third")
+
+-- Pop
+local top = table.remove(stack)  -- "third"
+assert(top == "third")
+assert(#stack == 2)
+```
+
+### Queue (FIFO)
+
+```lua
+local queue = {}
+local head, tail = 1, 1
+
+-- Enqueue
+local function enqueue(value)
+  queue[tail] = value
+  tail = tail + 1
+end
+
+-- Dequeue
+local function dequeue()
+  if head < tail then
+    local value = queue[head]
+    queue[head] = nil
+    head = head + 1
+    return value
+  end
+end
+
+enqueue("first")
+enqueue("second")
+assert(dequeue() == "first")
+assert(dequeue() == "second")
+```
+
+## Table References and Copying
+
+### References
+
+```lua
+local t1 = {x = 10}
+local t2 = t1  -- t2 references same table
+
+t2.x = 20
+assert(t1.x == 20)  -- t1 is also modified!
+```
+
+### Shallow Copy
+
+```lua
+local function shallowCopy(original)
+  local copy = {}
+  for k, v in pairs(original) do
+    copy[k] = v
+  end
+  return copy
+end
+
+local t1 = {x = 10, y = 20}
+local t2 = shallowCopy(t1)
+t2.x = 30
+assert(t1.x == 10)  -- t1 unchanged
+```
+
+### Deep Copy
+
+```lua
+local function deepCopy(original)
+  local copy
+  if type(original) == 'table' then
+    copy = {}
+    for k, v in pairs(original) do
+      copy[deepCopy(k)] = deepCopy(v)
+    end
+  else
+    copy = original
+  end
+  return copy
+end
+
+local t1 = {x = {y = 10}}
+local t2 = deepCopy(t1)
+t2.x.y = 20
+assert(t1.x.y == 10)  -- t1.x unchanged
+```
+
+## Raw Access
+
+Bypass metamethods with raw functions:
+
+```lua
+local t = {x = 10}
+setmetatable(t, {
+  __index = function() return 999 end,
+  __newindex = function() error("read-only") end
+})
+
+-- Regular access uses metamethods
+assert(t.y == 999)  -- __index called
+
+-- Raw access bypasses metamethods
+assert(rawget(t, "y") == nil)
+assert(rawget(t, "x") == 10)
+
+rawset(t, "z", 30)  -- No error, bypasses __newindex
+assert(rawget(t, "z") == 30)
+```
+
+## Table Size and Capacity
+
+```lua
+-- Count all elements
+local function tableSize(t)
+  local count = 0
+  for _ in pairs(t) do
+    count = count + 1
+  end
+  return count
+end
+
+local t = {10, 20, 30, x = "a", y = "b"}
+assert(tableSize(t) == 5)
+
+-- Array part length vs total size
+assert(#t == 3)           -- Array part only
+assert(tableSize(t) == 5) -- All elements
+```
+
+## Performance Tips
+
+<Note>
+**Best Practices for Table Performance:**
+
+1. Pre-allocate arrays when size is known: `local t = table.create(1000)`
+2. Use local variables for repeated access
+3. Avoid holes in arrays (nil values in sequence)
+4. Use numeric keys when possible (faster than string keys)
+5. Cache `#table` if using it multiple times in a loop
+</Note>
+
+```lua
+-- Pre-allocation (Lua 5.4+)
+local t = table.create(1000, 0)  -- Create array with 1000 elements
+
+-- Cache length
+local data = {1, 2, 3, 4, 5}
+local len = #data
+for i = 1, len do
+  print(data[i])
+end
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Metatables" icon="wand-magic-sparkles" href="./metatables">
+Customize table behavior with metamethods
+</Card>
+
+<Card title="Functions" icon="function" href="./functions">
+Master function features and closures
+</Card>
+
+<Card title="Modules" icon="box" href="./modules">
+Organize code with table-based modules
+</Card>
+
+<Card title="Data Types" icon="database" href="./data-types">
+Review all Lua data types
+</Card>
+</CardGroup>

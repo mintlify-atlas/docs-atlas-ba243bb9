@@ -1,0 +1,503 @@
+---
+title: 'I/O Functions'
+description: 'File input/output operations and stream management'
+---
+
+The io library provides functions for file input/output operations. It supports both simple and advanced file operations.
+
+## File Operations
+
+<Accordion title="io.open">
+Opens a file in the specified mode.
+
+```lua
+io.open(filename [, mode])
+```
+
+**Modes:**
+- `"r"` - Read (default)
+- `"w"` - Write (overwrite)
+- `"a"` - Append
+- `"r+"` - Read/write (file must exist)
+- `"w+"` - Read/write (overwrite)
+- `"a+"` - Read/append
+- Add `"b"` for binary mode
+
+**Returns:** File handle or nil + error message
+
+**Example:**
+```lua
+-- Read file
+local file = io.open("data.txt", "r")
+if file then
+  local content = file:read("*a")
+  file:close()
+  print(content)
+end
+
+-- Write file
+local file = io.open("output.txt", "w")
+if file then
+  file:write("Hello, World!\n")
+  file:close()
+end
+
+-- Error handling
+local file, err = io.open("missing.txt", "r")
+if not file then
+  print("Error:", err)
+end
+```
+</Accordion>
+
+<Accordion title="io.close">
+Closes a file handle (or default output file).
+
+```lua
+io.close([file])
+```
+
+**Example:**
+```lua
+local file = io.open("data.txt", "r")
+-- ... use file ...
+io.close(file)
+```
+</Accordion>
+
+<Accordion title="io.type">
+Checks if object is a file handle.
+
+```lua
+io.type(obj)
+```
+
+**Returns:** `"file"`, `"closed file"`, or `nil`
+
+**Example:**
+```lua
+local file = io.open("data.txt", "r")
+print(io.type(file))  -- "file"
+file:close()
+print(io.type(file))  -- "closed file"
+print(io.type("text"))  -- nil
+```
+</Accordion>
+
+## Default Files
+
+<Accordion title="io.input">
+Sets or gets the default input file.
+
+```lua
+io.input([file])
+```
+
+**Example:**
+```lua
+-- Set default input
+io.input("data.txt")
+local line = io.read()
+
+-- Reset to stdin
+io.input(io.stdin)
+```
+</Accordion>
+
+<Accordion title="io.output">
+Sets or gets the default output file.
+
+```lua
+io.output([file])
+```
+
+**Example:**
+```lua
+-- Redirect output to file
+io.output("log.txt")
+io.write("Log entry\n")
+
+-- Reset to stdout
+io.output(io.stdout)
+```
+</Accordion>
+
+## Reading
+
+<Accordion title="io.read">
+Reads from the default input file.
+
+```lua
+io.read(...)
+```
+
+**Formats:**
+- `"n"` - Read a number
+- `"a"` - Read entire file
+- `"l"` - Read line (no newline)
+- `"L"` - Read line (with newline)
+- `number` - Read specified number of bytes
+
+**Example:**
+```lua
+-- Read number
+local n = io.read("n")
+
+-- Read line
+local line = io.read("l")
+
+-- Read entire file
+local content = io.read("a")
+
+-- Read specific bytes
+local bytes = io.read(10)
+
+-- Read multiple
+local name, age = io.read("l", "n")
+```
+</Accordion>
+
+<Accordion title="file:read">
+Reads from a specific file handle.
+
+```lua
+file:read(...)
+```
+
+**Example:**
+```lua
+local file = io.open("data.txt", "r")
+while true do
+  local line = file:read("l")
+  if not line then break end
+  print(line)
+end
+file:close()
+```
+</Accordion>
+
+<Accordion title="io.lines">
+Returns an iterator for lines in a file.
+
+```lua
+io.lines([filename [, ...]])
+```
+
+**Example:**
+```lua
+-- Iterate over lines
+for line in io.lines("data.txt") do
+  print(line)
+end
+
+-- With format
+for num in io.lines("numbers.txt", "n") do
+  print(num * 2)
+end
+```
+</Accordion>
+
+<Accordion title="file:lines">
+Returns an iterator for lines in an open file.
+
+```lua
+file:lines(...)
+```
+
+**Example:**
+```lua
+local file = io.open("data.txt", "r")
+for line in file:lines() do
+  print(line)
+end
+file:close()
+```
+</Accordion>
+
+## Writing
+
+<Accordion title="io.write">
+Writes to the default output file.
+
+```lua
+io.write(...)
+```
+
+**Example:**
+```lua
+io.write("Hello, ")
+io.write("World!\n")
+io.write("Number: ", 42, "\n")
+```
+</Accordion>
+
+<Accordion title="file:write">
+Writes to a specific file handle.
+
+```lua
+file:write(...)
+```
+
+**Returns:** File handle or nil + error message
+
+**Example:**
+```lua
+local file = io.open("output.txt", "w")
+file:write("Line 1\n")
+file:write("Line 2\n")
+file:write("Line 3\n")
+file:close()
+```
+</Accordion>
+
+<Accordion title="io.flush">
+Flushes the default output file.
+
+```lua
+io.flush()
+```
+
+**Example:**
+```lua
+io.write("Processing...")
+io.flush()  -- Ensure output is written immediately
+-- ... long operation ...
+io.write(" Done!\n")
+```
+</Accordion>
+
+<Accordion title="file:flush">
+Flushes a specific file handle.
+
+```lua
+file:flush()
+```
+</Accordion>
+
+## File Position
+
+<Accordion title="file:seek">
+Gets or sets the file position.
+
+```lua
+file:seek([whence [, offset]])
+```
+
+**Whence values:**
+- `"set"` - From beginning (default)
+- `"cur"` - From current position
+- `"end"` - From end
+
+**Returns:** New position or nil + error
+
+**Example:**
+```lua
+local file = io.open("data.bin", "rb")
+
+-- Get current position
+local pos = file:seek()
+
+-- Go to beginning
+file:seek("set", 0)
+
+-- Go to end
+file:seek("end")
+
+-- Go back 10 bytes
+file:seek("cur", -10)
+
+file:close()
+```
+</Accordion>
+
+<Accordion title="file:setvbuf">
+Sets the buffering mode for a file.
+
+```lua
+file:setvbuf(mode [, size])
+```
+
+**Modes:**
+- `"no"` - No buffering
+- `"full"` - Full buffering
+- `"line"` - Line buffering
+
+**Example:**
+```lua
+local file = io.open("output.txt", "w")
+file:setvbuf("line")  -- Flush on newline
+file:write("Line 1\n")  -- Flushed immediately
+file:close()
+```
+</Accordion>
+
+## Temporary Files
+
+<Accordion title="io.tmpfile">
+Creates a temporary file.
+
+```lua
+io.tmpfile()
+```
+
+**Returns:** File handle (auto-deleted on close)
+
+**Example:**
+```lua
+local temp = io.tmpfile()
+temp:write("Temporary data\n")
+temp:seek("set", 0)
+local content = temp:read("a")
+temp:close()  -- File is deleted
+```
+</Accordion>
+
+## Process I/O
+
+<Accordion title="io.popen">
+Opens a process for reading or writing.
+
+```lua
+io.popen(prog [, mode])
+```
+
+**Modes:** `"r"` (default) or `"w"`
+
+**Example:**
+```lua
+-- Read command output
+local handle = io.popen("ls -l")
+local result = handle:read("*a")
+handle:close()
+print(result)
+
+-- Write to command
+local handle = io.popen("grep pattern", "w")
+handle:write("line 1\n")
+handle:write("line with pattern\n")
+handle:write("line 3\n")
+handle:close()
+```
+</Accordion>
+
+## Standard Streams
+
+<Accordion title="io.stdin, io.stdout, io.stderr">
+Standard input, output, and error streams.
+
+**Example:**
+```lua
+-- Read from stdin
+local line = io.stdin:read()
+
+-- Write to stdout
+io.stdout:write("Output\n")
+
+-- Write to stderr
+io.stderr:write("Error message\n")
+```
+</Accordion>
+
+## Complete Examples
+
+### Copy File
+
+```lua
+function copyFile(source, dest)
+  local input = io.open(source, "rb")
+  if not input then return false, "Cannot open source" end
+  
+  local output = io.open(dest, "wb")
+  if not output then
+    input:close()
+    return false, "Cannot create destination"
+  end
+  
+  while true do
+    local block = input:read(8192)  -- Read in blocks
+    if not block then break end
+    output:write(block)
+  end
+  
+  input:close()
+  output:close()
+  return true
+end
+```
+
+### Read CSV File
+
+```lua
+function readCSV(filename)
+  local rows = {}
+  local file = io.open(filename, "r")
+  if not file then return nil end
+  
+  for line in file:lines() do
+    local row = {}
+    for field in line:gmatch('[^,]+') do
+      table.insert(row, field)
+    end
+    table.insert(rows, row)
+  end
+  
+  file:close()
+  return rows
+end
+```
+
+### Write Log File
+
+```lua
+local Logger = {}
+
+function Logger:new(filename)
+  local obj = {file = io.open(filename, "a")}
+  setmetatable(obj, self)
+  self.__index = self
+  return obj
+end
+
+function Logger:log(message)
+  if self.file then
+    self.file:write(os.date("%Y-%m-%d %H:%M:%S"), " ", message, "\n")
+    self.file:flush()
+  end
+end
+
+function Logger:close()
+  if self.file then
+    self.file:close()
+    self.file = nil
+  end
+end
+
+-- Usage
+local logger = Logger:new("app.log")
+logger:log("Application started")
+logger:log("Processing data")
+logger:close()
+```
+
+### Read Configuration File
+
+```lua
+function readConfig(filename)
+  local config = {}
+  local file = io.open(filename, "r")
+  if not file then return config end
+  
+  for line in file:lines() do
+    -- Skip comments and empty lines
+    if not line:match("^%s*#") and line:match("%S") then
+      local key, value = line:match("^%s*(.-)%s*=%s*(.-)%s*$")
+      if key and value then
+        config[key] = value
+      end
+    end
+  end
+  
+  file:close()
+  return config
+end
+```

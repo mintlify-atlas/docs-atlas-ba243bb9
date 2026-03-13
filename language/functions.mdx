@@ -1,0 +1,522 @@
+---
+title: Functions
+description: Master function definition, calls, closures, and advanced function features in Lua
+---
+
+## Function Basics
+
+### Defining Functions
+
+<Tabs>
+<Tab title="Standard Syntax">
+```lua
+function greet(name)
+  return "Hello, " .. name
+end
+
+print(greet("Alice"))  -- Hello, Alice
+```
+</Tab>
+
+<Tab title="Local Functions">
+```lua
+local function add(a, b)
+  return a + b
+end
+
+print(add(5, 3))  -- 8
+```
+</Tab>
+
+<Tab title="Anonymous Functions">
+```lua
+local multiply = function(a, b)
+  return a * b
+end
+
+print(multiply(4, 5))  -- 20
+```
+</Tab>
+</Tabs>
+
+<Note>
+Always prefer `local function` for better performance and to avoid polluting the global namespace.
+</Note>
+
+### Function Calls
+
+```lua
+-- Regular call
+local result = math.max(10, 20, 30)
+
+-- Call with no arguments
+local time = os.time()
+
+-- Call with table constructor
+print{"hello", "world"}  -- Parentheses optional with single table arg
+
+-- Call with string literal
+print"Hello"  -- Parentheses optional with single string arg
+```
+
+## Multiple Return Values
+
+Lua functions can return multiple values:
+
+### Returning Multiple Values
+
+```lua
+local function minmax(a, b)
+  if a < b then
+    return a, b
+  else
+    return b, a
+  end
+end
+
+local min, max = minmax(10, 5)
+assert(min == 5 and max == 10)
+```
+
+### Multiple Returns in Different Contexts
+
+<CodeGroup>
+```lua Assignment
+local function f()
+  return 1, 2, 3
+end
+
+-- Multiple assignment
+local a, b, c = f()
+assert(a == 1 and b == 2 and c == 3)
+
+-- Parentheses adjust to one return value
+local x = (f())
+assert(x == 1)
+```
+
+```lua Table Constructor
+local function f()
+  return 1, 2, 3, 4
+end
+
+-- Last expression expands
+local t = {f()}
+assert(t[1] == 1 and t[4] == 4)
+
+-- Not last - only first value
+local t2 = {f(), 10}
+assert(t2[1] == 1 and t2[2] == 10)
+```
+
+```lua Function Arguments
+local function f()
+  return 1, 2, 3
+end
+
+local function g(a, b, c)
+  return a + b + c
+end
+
+-- Last argument expands
+assert(g(f()) == 6)  -- 1 + 2 + 3
+
+-- Not last - only first value
+assert(g(f(), 10) == 13)  -- 1 + 10 + 2
+```
+</CodeGroup>
+
+## Variable Arguments (Varargs)
+
+Functions can accept variable numbers of arguments:
+
+### Basic Varargs
+
+```lua
+local function sum(...)
+  local result = 0
+  for i, v in ipairs{...} do
+    result = result + v
+  end
+  return result
+end
+
+assert(sum(1, 2, 3, 4) == 10)
+assert(sum() == 0)
+```
+
+### Varargs with select()
+
+```lua
+local function printArgs(...)
+  local n = select('#', ...)  -- Count arguments
+  print("Number of arguments:", n)
+  
+  for i = 1, n do
+    local arg = select(i, ...)
+    print(i, arg)
+  end
+end
+
+printArgs("a", "b", "c")
+-- Number of arguments: 3
+-- 1  a
+-- 2  b
+-- 3  c
+```
+
+### Mixed Parameters and Varargs
+
+```lua
+local function format(fmt, ...)
+  return string.format(fmt, ...)
+end
+
+local msg = format("Hello, %s! You are %d years old.", "Alice", 30)
+assert(msg == "Hello, Alice! You are 30 years old.")
+```
+
+## Closures
+
+Functions can capture variables from outer scopes:
+
+### Basic Closures
+
+```lua
+local function makeCounter()
+  local count = 0
+  return function()
+    count = count + 1
+    return count
+  end
+end
+
+local counter1 = makeCounter()
+local counter2 = makeCounter()
+
+assert(counter1() == 1)
+assert(counter1() == 2)
+assert(counter2() == 1)  -- Independent counter
+assert(counter1() == 3)
+```
+
+### Closures in Loops
+
+```lua
+local functions = {}
+
+for i = 1, 5 do
+  functions[i] = function()
+    return i
+  end
+end
+
+assert(functions[1]() == 1)
+assert(functions[3]() == 3)
+assert(functions[5]() == 5)
+```
+
+### Multi-level Closures
+
+```lua
+local function f(x)
+  return function(y)
+    return function(z)
+      return x + y + z
+    end
+  end
+end
+
+local g = f(10)
+assert(g(20)(30) == 60)
+```
+
+<Note>
+Closures allow you to create private variables and implement encapsulation in Lua.
+</Note>
+
+## Tail Calls
+
+Lua optimizes tail calls to prevent stack overflow:
+
+```lua
+-- Tail call - no stack growth
+local function factorial(n, acc)
+  acc = acc or 1
+  if n == 0 then
+    return acc
+  else
+    return factorial(n - 1, n * acc)  -- Tail call
+  end
+end
+
+assert(factorial(5) == 120)
+
+-- Deep recursion with tail calls
+local function deep(n)
+  if n > 0 then
+    return deep(n - 1)  -- Tail call
+  else
+    return 101
+  end
+end
+
+assert(deep(30000) == 101)  -- No stack overflow!
+```
+
+### Tail Call Requirements
+
+```lua
+-- These ARE tail calls:
+return f(x)
+return (f(x))
+
+-- These are NOT tail calls:
+return f(x) + 1        -- Operation after call
+return x, f(y)         -- Not the only return value
+return f(x).field      -- Field access after call
+local a = f(x); return a  -- Result is used
+```
+
+## Method Calls
+
+Lua supports object-oriented method syntax:
+
+### Defining Methods
+
+```lua
+local obj = {value = 10}
+
+function obj:increment()
+  self.value = self.value + 1
+  return self  -- Enable chaining
+end
+
+function obj:getValue()
+  return self.value
+end
+
+-- Method calls
+obj:increment():increment():increment()
+assert(obj:getValue() == 13)
+```
+
+### Colon vs Dot Syntax
+
+```lua
+local person = {name = "Alice"}
+
+-- These are equivalent:
+function person.greet(self)
+  return "Hello, " .. self.name
+end
+
+function person:greet2()
+  return "Hello, " .. self.name
+end
+
+-- These calls are equivalent:
+assert(person.greet(person) == "Hello, Alice")
+assert(person:greet() == "Hello, Alice")
+```
+
+## Higher-Order Functions
+
+Functions that take or return functions:
+
+### Functions as Arguments
+
+```lua
+local function map(tbl, fn)
+  local result = {}
+  for i, v in ipairs(tbl) do
+    result[i] = fn(v)
+  end
+  return result
+end
+
+local numbers = {1, 2, 3, 4, 5}
+local squared = map(numbers, function(x) return x * x end)
+
+assert(squared[1] == 1 and squared[5] == 25)
+```
+
+### Functions Returning Functions
+
+```lua
+local function makeAdder(x)
+  return function(y)
+    return x + y
+  end
+end
+
+local add5 = makeAdder(5)
+local add10 = makeAdder(10)
+
+assert(add5(3) == 8)
+assert(add10(3) == 13)
+```
+
+## Fixed-Point Combinator
+
+Advanced functional programming example:
+
+```lua
+-- Y combinator (Z combinator in eager evaluation)
+local Z = function(le)
+  local function a(f)
+    return le(function(x) return f(f)(x) end)
+  end
+  return a(a)
+end
+
+-- Non-recursive factorial using Z
+local F = function(f)
+  return function(n)
+    if n == 0 then
+      return 1
+    else
+      return n * f(n - 1)
+    end
+  end
+end
+
+local factorial = Z(F)
+assert(factorial(5) == 120)
+```
+
+## Function Environments
+
+Control what globals a function can access:
+
+```lua
+-- Create function with custom environment
+local env = {x = 10, y = 20}
+local f = load("return x + y", "chunk", "t", env)
+assert(f() == 30)
+
+-- Function doesn't see global variables
+local g = load("return print", "chunk", "t", env)
+assert(g() == nil)  -- print not in env
+```
+
+## Error Handling in Functions
+
+### Using pcall
+
+```lua
+local function divide(a, b)
+  if b == 0 then
+    error("Division by zero")
+  end
+  return a / b
+end
+
+local success, result = pcall(divide, 10, 2)
+assert(success and result == 5)
+
+local success, err = pcall(divide, 10, 0)
+assert(not success and string.find(err, "Division by zero"))
+```
+
+### Using xpcall
+
+```lua
+local function errorHandler(err)
+  return "Error: " .. tostring(err) .. "\n" .. debug.traceback()
+end
+
+local function riskyOperation()
+  error("Something went wrong")
+end
+
+local success, result = xpcall(riskyOperation, errorHandler)
+assert(not success)
+```
+
+## Function Introspection
+
+```lua
+local debug = require("debug")
+
+local function example(a, b, c)
+  return a + b + c
+end
+
+-- Get function info
+local info = debug.getinfo(example)
+print(info.name)           -- function name
+print(info.linedefined)    -- line where defined
+print(info.nparams)        -- number of parameters
+```
+
+## Practical Patterns
+
+### Memoization
+
+```lua
+local function memoize(fn)
+  local cache = {}
+  return function(...)
+    local key = table.concat({...}, ",")
+    if cache[key] == nil then
+      cache[key] = fn(...)
+    end
+    return cache[key]
+  end
+end
+
+local function fibonacci(n)
+  if n <= 1 then return n end
+  return fibonacci(n - 1) + fibonacci(n - 2)
+end
+
+fibonacci = memoize(fibonacci)
+assert(fibonacci(10) == 55)
+```
+
+### Partial Application
+
+```lua
+local function partial(fn, ...)
+  local args1 = {...}
+  return function(...)
+    local args2 = {...}
+    local allArgs = {}
+    for i, v in ipairs(args1) do
+      allArgs[i] = v
+    end
+    for i, v in ipairs(args2) do
+      allArgs[#args1 + i] = v
+    end
+    return fn(table.unpack(allArgs))
+  end
+end
+
+local function add3(a, b, c)
+  return a + b + c
+end
+
+local add10andMore = partial(add3, 10)
+assert(add10andMore(5, 3) == 18)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Tables" icon="table" href="./tables">
+Learn about Lua's table data structure
+</Card>
+
+<Card title="Metatables" icon="wand-magic-sparkles" href="./metatables">
+Customize behavior with metamethods
+</Card>
+
+<Card title="Coroutines" icon="arrows-spin" href="./coroutines">
+Implement cooperative multitasking
+</Card>
+
+<Card title="Modules" icon="box" href="./modules">
+Organize code with modules
+</Card>
+</CardGroup>

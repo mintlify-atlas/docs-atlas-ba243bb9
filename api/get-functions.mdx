@@ -1,0 +1,355 @@
+---
+title: Get Functions
+description: Functions for retrieving values from Lua and pushing them onto the stack
+---
+
+## Overview
+
+These functions retrieve values from Lua (globals, tables, metatables) and push them onto the stack.
+
+## Functions
+
+### lua_getglobal
+
+Pushes onto the stack the value of the global variable `name`.
+
+```c
+int lua_getglobal(lua_State *L, const char *name);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="name" type="const char*" required>
+  The name of the global variable
+</ParamField>
+
+**Returns:** The type of the pushed value.
+
+**Example:**
+
+```c
+lua_getglobal(L, "print");
+// Stack: print function
+
+lua_getglobal(L, "math");
+// Stack: math table
+```
+
+### lua_gettable
+
+Pushes onto the stack the value `t[k]`, where `t` is the table at the given index and `k` is the value on top of the stack.
+
+```c
+int lua_gettable(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+**Returns:** The type of the pushed value.
+
+**Example:**
+
+```c
+lua_getglobal(L, "math");      // Stack: math
+lua_pushstring(L, "pi");       // Stack: math, "pi"
+lua_gettable(L, -2);           // Stack: math, math.pi
+// Result: math.pi is now on top of stack
+```
+
+### lua_getfield
+
+Pushes onto the stack the value `t[k]`, where `t` is the table at the given index.
+
+```c
+int lua_getfield(lua_State *L, int idx, const char *k);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+<ParamField path="k" type="const char*" required>
+  The field name
+</ParamField>
+
+**Returns:** The type of the pushed value.
+
+**Example:**
+
+```c
+lua_getglobal(L, "math");      // Stack: math
+lua_getfield(L, -1, "pi");     // Stack: math, math.pi
+lua_getfield(L, -2, "sin");    // Stack: math, math.pi, math.sin
+```
+
+### lua_geti
+
+Pushes onto the stack the value `t[n]`, where `t` is the table at the given index.
+
+```c
+int lua_geti(lua_State *L, int idx, lua_Integer n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+<ParamField path="n" type="lua_Integer" required>
+  The integer key
+</ParamField>
+
+**Returns:** The type of the pushed value.
+
+**Example:**
+
+```c
+// Assuming table at index 1 is {10, 20, 30}
+lua_geti(L, 1, 1);  // Stack: ..., 10
+lua_geti(L, 1, 2);  // Stack: ..., 10, 20
+lua_geti(L, 1, 3);  // Stack: ..., 10, 20, 30
+```
+
+### lua_rawget
+
+Similar to `lua_gettable`, but does a raw access (without metamethods).
+
+```c
+int lua_rawget(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+**Returns:** The type of the pushed value.
+
+**Example:**
+
+```c
+lua_getglobal(L, "t");         // Stack: t
+lua_pushstring(L, "key");      // Stack: t, "key"
+lua_rawget(L, -2);             // Stack: t, t.key (no __index)
+```
+
+### lua_rawgeti
+
+Pushes onto the stack the value `t[n]`, where `t` is the table at the given index (raw access).
+
+```c
+int lua_rawgeti(lua_State *L, int idx, lua_Integer n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+<ParamField path="n" type="lua_Integer" required>
+  The integer key
+</ParamField>
+
+**Returns:** The type of the pushed value.
+
+**Example:**
+
+```c
+lua_rawgeti(L, 1, 5);  // Get t[5] without metamethods
+```
+
+### lua_rawgetp
+
+Pushes onto the stack the value `t[p]`, where `t` is the table at the given index and `p` is a light userdata.
+
+```c
+int lua_rawgetp(lua_State *L, int idx, const void *p);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+<ParamField path="p" type="const void*" required>
+  The pointer key
+</ParamField>
+
+**Returns:** The type of the pushed value.
+
+**Example:**
+
+```c
+void *key = &my_global_var;
+lua_rawgetp(L, LUA_REGISTRYINDEX, key);
+// Retrieves value associated with pointer key
+```
+
+### lua_createtable
+
+Creates a new empty table and pushes it onto the stack.
+
+```c
+void lua_createtable(lua_State *L, int narr, int nrec);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="narr" type="int" required>
+  Number of pre-allocated array elements
+</ParamField>
+
+<ParamField path="nrec" type="int" required>
+  Number of pre-allocated non-array elements
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+// Create table for an array of 100 elements
+lua_createtable(L, 100, 0);
+
+// Create table for a record with ~20 fields
+lua_createtable(L, 0, 20);
+
+// Generic empty table
+lua_newtable(L);  // Equivalent to lua_createtable(L, 0, 0)
+```
+
+### lua_newuserdatauv
+
+Creates and pushes a new full userdata onto the stack.
+
+```c
+void *lua_newuserdatauv(lua_State *L, size_t sz, int nuvalue);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="sz" type="size_t" required>
+  The size of the memory block in bytes
+</ParamField>
+
+<ParamField path="nuvalue" type="int" required>
+  The number of associated Lua values (user values)
+</ParamField>
+
+**Returns:** The address of the new block.
+
+**Example:**
+
+```c
+typedef struct {
+    int x;
+    int y;
+} Point;
+
+Point *p = (Point *)lua_newuserdatauv(L, sizeof(Point), 0);
+p->x = 10;
+p->y = 20;
+// Stack: userdata
+```
+
+### lua_getmetatable
+
+Pushes onto the stack the metatable of the value at the given index.
+
+```c
+int lua_getmetatable(lua_State *L, int objindex);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="objindex" type="int" required>
+  The stack index of the object
+</ParamField>
+
+**Returns:** 1 if the object has a metatable, 0 otherwise.
+
+**Example:**
+
+```c
+lua_getglobal(L, "myobject");
+if (lua_getmetatable(L, -1)) {
+    // Stack: myobject, metatable
+    printf("Object has a metatable\n");
+} else {
+    printf("Object has no metatable\n");
+}
+```
+
+### lua_getiuservalue
+
+Pushes onto the stack the n-th user value associated with the full userdata at the given index.
+
+```c
+int lua_getiuservalue(lua_State *L, int idx, int n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the userdata
+</ParamField>
+
+<ParamField path="n" type="int" required>
+  The user value index (1-based)
+</ParamField>
+
+**Returns:** The type of the pushed value, or `LUA_TNONE` if the index is out of range.
+
+**Example:**
+
+```c
+void *ud = lua_newuserdatauv(L, 100, 2);
+lua_pushstring(L, "extra data");
+lua_setiuservalue(L, -2, 1);
+
+// Later, retrieve it:
+int t = lua_getiuservalue(L, -1, 1);
+if (t == LUA_TSTRING) {
+    printf("User value: %s\n", lua_tostring(L, -1));
+}
+```
+
+## Helper Macros
+
+```c
+#define lua_newtable(L)          lua_createtable(L, 0, 0)
+#define lua_newuserdata(L,s)     lua_newuserdatauv(L,s,1)
+#define lua_getuservalue(L,idx)  lua_getiuservalue(L,idx,1)
+```

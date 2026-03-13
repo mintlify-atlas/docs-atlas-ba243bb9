@@ -1,0 +1,228 @@
+---
+title: 'Module Loading'
+description: 'Functions for loading and managing Lua modules'
+---
+
+The auxiliary library provides functions for loading modules and managing library registration.
+
+## Library Registration
+
+<Accordion title="luaL_setfuncs">
+Registers all functions in the array `l` into the table on top of the stack.
+
+```c
+void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup);
+```
+
+**Parameters:**
+- `l` - Array of `luaL_Reg` structures
+- `nup` - Number of upvalues to copy to each function
+
+**Example:**
+```c
+static const luaL_Reg mylib[] = {
+  {"function1", my_function1},
+  {"function2", my_function2},
+  {NULL, NULL}
+};
+
+LUALIB_API int luaopen_mylib(lua_State *L) {
+  luaL_newlib(L, mylib);
+  return 1;
+}
+```
+
+**Lua usage:**
+```lua
+local mylib = require("mylib")
+mylib.function1()
+```
+</Accordion>
+
+<Accordion title="luaL_newlib">
+Creates a new table and registers the functions in list `l` into it.
+
+```c
+#define luaL_newlib(L,l)  \
+  (luaL_checkversion(L), luaL_newlibtable(L,l), luaL_setfuncs(L,l,0))
+```
+
+**Parameters:**
+- `l` - Array of function registrations
+
+**Example:**
+```lua
+-- After luaL_newlib in C, the module is available:
+local math = require("math")
+print(math.sin(0))  -- 0.0
+```
+</Accordion>
+
+<Accordion title="luaL_requiref">
+Loads a module, stores it in `package.loaded[modname]`, and optionally in a global variable.
+
+```c
+void luaL_requiref (lua_State *L, const char *modname,
+                    lua_CFunction openf, int glb);
+```
+
+**Parameters:**
+- `modname` - Module name
+- `openf` - Module opening function
+- `glb` - If true, also stores in global table
+
+**Example:**
+```lua
+-- Standard libraries are loaded with luaL_requiref
+require("string")
+require("table")
+require("math")
+```
+</Accordion>
+
+## Module Structure
+
+<Accordion title="luaL_Reg">
+Structure for registering C functions.
+
+```c
+typedef struct luaL_Reg {
+  const char *name;      /* function name */
+  lua_CFunction func;    /* function pointer */
+} luaL_Reg;
+```
+
+**Example:**
+```c
+static int my_add(lua_State *L) {
+  lua_Number a = luaL_checknumber(L, 1);
+  lua_Number b = luaL_checknumber(L, 2);
+  lua_pushnumber(L, a + b);
+  return 1;
+}
+
+static const luaL_Reg mathext[] = {
+  {"add", my_add},
+  {NULL, NULL}
+};
+```
+</Accordion>
+
+## Subtables
+
+<Accordion title="luaL_getsubtable">
+Ensures that a subtable exists at the given index and field name.
+
+```c
+int luaL_getsubtable (lua_State *L, int idx, const char *fname);
+```
+
+**Parameters:**
+- `idx` - Stack index of parent table
+- `fname` - Field name
+
+**Returns:** 1 if finds existing table, 0 if creates new one
+
+**Example:**
+```lua
+-- Getting a subtable, creating if necessary
+local config = {}
+config.database = config.database or {}
+config.database.host = "localhost"
+```
+</Accordion>
+
+## Version Checking
+
+<Accordion title="luaL_checkversion">
+Checks that the Lua core running the code has the same version as the code that compiled it.
+
+```c
+void luaL_checkversion (lua_State *L);
+```
+
+**Purpose:** Prevents binary incompatibility issues between Lua versions.
+</Accordion>
+
+## Module Loading Example
+
+Here's a complete example of creating a Lua module in C:
+
+```c
+#include "lua.h"
+#include "lauxlib.h"
+
+// Module functions
+static int mymodule_hello(lua_State *L) {
+  const char *name = luaL_optstring(L, 1, "World");
+  lua_pushfstring(L, "Hello, %s!", name);
+  return 1;
+}
+
+static int mymodule_add(lua_State *L) {
+  lua_Number a = luaL_checknumber(L, 1);
+  lua_Number b = luaL_checknumber(L, 2);
+  lua_pushnumber(L, a + b);
+  return 1;
+}
+
+// Function registry
+static const luaL_Reg mymodule_funcs[] = {
+  {"hello", mymodule_hello},
+  {"add", mymodule_add},
+  {NULL, NULL}
+};
+
+// Module initialization
+int luaopen_mymodule(lua_State *L) {
+  luaL_newlib(L, mymodule_funcs);
+  
+  // Add module constants
+  lua_pushinteger(L, 42);
+  lua_setfield(L, -2, "THE_ANSWER");
+  
+  return 1;
+}
+```
+
+**Using the module in Lua:**
+
+```lua
+local mymodule = require("mymodule")
+
+print(mymodule.hello())           -- Hello, World!
+print(mymodule.hello("Lua"))      -- Hello, Lua!
+print(mymodule.add(10, 32))       -- 42
+print(mymodule.THE_ANSWER)        -- 42
+```
+
+## Package Management
+
+The `package` library provides the infrastructure for module loading:
+
+```lua
+-- Check if module is already loaded
+if package.loaded["mymodule"] then
+  print("Module already loaded")
+end
+
+-- Module search paths
+print(package.path)   -- Lua module paths
+print(package.cpath)  -- C module paths
+
+-- Preload a module
+package.preload["custom"] = function()
+  return {version = "1.0"}
+end
+
+local custom = require("custom")
+print(custom.version)  -- 1.0
+```
+
+## Best Practices
+
+1. **Always check version** - Use `luaL_checkversion` in module init
+2. **Null-terminate function arrays** - End with `{NULL, NULL}`
+3. **Return 1 from luaopen_*** - Convention for module loaders
+4. **Use appropriate prefixes** - Avoid name collisions
+5. **Document upvalues** - If using `nup > 0` in `luaL_setfuncs`

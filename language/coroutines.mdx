@@ -1,0 +1,553 @@
+---
+title: Coroutines
+description: Master cooperative multitasking with Lua's coroutine system
+---
+
+## Introduction
+
+Coroutines provide cooperative multitasking in Lua. Unlike threads, coroutines are not preemptive - they explicitly yield control to allow other coroutines to run.
+
+```lua
+local co = coroutine.create(function()
+  print("Hello from coroutine!")
+end)
+
+coroutine.resume(co)  -- Hello from coroutine!
+```
+
+## Creating Coroutines
+
+### coroutine.create()
+
+Create a coroutine from a function:
+
+```lua
+local co = coroutine.create(function()
+  print("Coroutine running")
+  return "done"
+end)
+
+assert(type(co) == "thread")
+assert(coroutine.status(co) == "suspended")
+```
+
+### coroutine.wrap()
+
+Create a coroutine that returns a function:
+
+```lua
+local co = coroutine.wrap(function(x)
+  print("Received:", x)
+  return x * 2
+end)
+
+local result = co(5)  -- More convenient than resume
+assert(result == 10)
+```
+
+<Note>
+`coroutine.wrap()` returns a function that resumes the coroutine, while `coroutine.create()` returns a thread object that must be used with `coroutine.resume()`.
+</Note>
+
+## Running Coroutines
+
+### coroutine.resume()
+
+Start or resume a coroutine:
+
+```lua
+local co = coroutine.create(function(a, b)
+  print("Arguments:", a, b)
+  return a + b
+end)
+
+local success, result = coroutine.resume(co, 5, 10)
+assert(success == true)
+assert(result == 15)
+```
+
+### Error Handling
+
+```lua
+local co = coroutine.create(function()
+  error("Something went wrong!")
+end)
+
+local success, err = coroutine.resume(co)
+assert(not success)
+assert(string.find(err, "Something went wrong"))
+```
+
+## Yielding from Coroutines
+
+### coroutine.yield()
+
+Pause execution and return to caller:
+
+<Tabs>
+<Tab title="Basic Yield">
+```lua
+local co = coroutine.create(function()
+  print("Step 1")
+  coroutine.yield()
+  print("Step 2")
+  coroutine.yield()
+  print("Step 3")
+end)
+
+coroutine.resume(co)  -- Step 1
+coroutine.resume(co)  -- Step 2
+coroutine.resume(co)  -- Step 3
+```
+</Tab>
+
+<Tab title="Yield with Values">
+```lua
+local co = coroutine.create(function(x)
+  local y = coroutine.yield(x * 2)
+  return x + y
+end)
+
+local _, result1 = coroutine.resume(co, 5)
+assert(result1 == 10)  -- Yielded value
+
+local _, result2 = coroutine.resume(co, 3)
+assert(result2 == 8)   -- Return value: 5 + 3
+```
+</Tab>
+</Tabs>
+
+### Multiple Values
+
+```lua
+local co = coroutine.create(function(...)
+  local args = {...}
+  for i = 1, #args do
+    coroutine.yield(table.unpack(args[i]))
+  end
+end)
+
+local s, a, b, c = coroutine.resume(co, {1, 2, 3}, {4, 5})
+assert(s and a == 1 and b == 2 and c == 3)
+
+local s, a, b = coroutine.resume(co)
+assert(s and a == 4 and b == 5)
+```
+
+## Coroutine Status
+
+### coroutine.status()
+
+Check the state of a coroutine:
+
+```lua
+local co = coroutine.create(function()
+  coroutine.yield()
+end)
+
+assert(coroutine.status(co) == "suspended")
+
+coroutine.resume(co)
+assert(coroutine.status(co) == "suspended")  -- Yielded
+
+coroutine.resume(co)
+assert(coroutine.status(co) == "dead")  -- Finished
+```
+
+Possible states:
+- **suspended** - Created but not yet run, or yielded
+- **running** - Currently executing
+- **normal** - Resumed another coroutine (not yielded, not running)
+- **dead** - Finished or encountered error
+
+### coroutine.running()
+
+Get the currently running coroutine:
+
+```lua
+local main, ismain = coroutine.running()
+assert(type(main) == "thread")
+assert(ismain == true)  -- Main thread
+
+local co = coroutine.create(function()
+  local current, ismain = coroutine.running()
+  assert(current == co)
+  assert(ismain == false)
+end)
+
+coroutine.resume(co)
+```
+
+## Practical Examples
+
+### Producer-Consumer Pattern
+
+```lua
+local function producer()
+  return coroutine.create(function()
+    for i = 1, 5 do
+      print("Producing:", i)
+      coroutine.yield(i)
+    end
+  end)
+end
+
+local function consumer(prod)
+  while true do
+    local status, value = coroutine.resume(prod)
+    if not status or coroutine.status(prod) == "dead" then
+      break
+    end
+    print("Consuming:", value)
+  end
+end
+
+local prod = producer()
+consumer(prod)
+```
+
+### Iterator Pattern
+
+Implement custom iterators using coroutines:
+
+```lua
+local function range(from, to, step)
+  step = step or 1
+  return coroutine.wrap(function()
+    for i = from, to, step do
+      coroutine.yield(i)
+    end
+  end)
+end
+
+for i in range(1, 10, 2) do
+  print(i)  -- 1, 3, 5, 7, 9
+end
+```
+
+### Sieve of Eratosthenes
+
+Generate prime numbers using coroutines:
+
+```lua
+local function generate(n)
+  return coroutine.wrap(function()
+    for i = 2, n do
+      coroutine.yield(i)
+    end
+  end)
+end
+
+local function filter(p, gen)
+  return coroutine.wrap(function()
+    while true do
+      local n = gen()
+      if n == nil then return end
+      if n % p ~= 0 then
+        coroutine.yield(n)
+      end
+    end
+  end)
+end
+
+-- Find primes up to 30
+local primes = {}
+local gen = generate(30)
+
+while true do
+  local prime = gen()
+  if prime == nil then break end
+  table.insert(primes, prime)
+  gen = filter(prime, gen)
+end
+
+assert(primes[1] == 2)
+assert(primes[#primes] == 29)
+```
+
+## Advanced Patterns
+
+### Cooperative Scheduler
+
+```lua
+local tasks = {}
+
+local function spawn(func)
+  table.insert(tasks, coroutine.create(func))
+end
+
+local function runScheduler()
+  while #tasks > 0 do
+    local task = table.remove(tasks, 1)
+    local status, err = coroutine.resume(task)
+    
+    if not status then
+      print("Error:", err)
+    elseif coroutine.status(task) ~= "dead" then
+      table.insert(tasks, task)  -- Re-queue
+    end
+  end
+end
+
+-- Example tasks
+spawn(function()
+  for i = 1, 3 do
+    print("Task A:", i)
+    coroutine.yield()
+  end
+end)
+
+spawn(function()
+  for i = 1, 3 do
+    print("Task B:", i)
+    coroutine.yield()
+  end
+end)
+
+runScheduler()
+```
+
+### Asynchronous Operations
+
+```lua
+local pending = {}
+
+local function async(func)
+  local co = coroutine.create(func)
+  coroutine.resume(co)
+  return co
+end
+
+local function await(operation)
+  table.insert(pending, {op = operation, co = coroutine.running()})
+  return coroutine.yield()
+end
+
+-- Simulate async operation
+local function fetchData(url)
+  return async(function()
+    print("Fetching:", url)
+    local result = await({url = url, delay = 1})
+    print("Got:", result)
+    return result
+  end)
+end
+```
+
+### State Machines
+
+```lua
+local function stateMachine()
+  return coroutine.wrap(function()
+    while true do
+      print("State: IDLE")
+      local input = coroutine.yield()
+      
+      if input == "start" then
+        print("State: RUNNING")
+        while true do
+          input = coroutine.yield()
+          if input == "pause" then break end
+          print("Processing:", input)
+        end
+        
+        print("State: PAUSED")
+        while true do
+          input = coroutine.yield()
+          if input == "resume" then break end
+        end
+      end
+    end
+  end)
+end
+
+local sm = stateMachine()
+sm()
+sm("start")
+sm("data1")
+sm("pause")
+sm("resume")
+```
+
+## Coroutines with Metamethods
+
+Yield from metamethods:
+
+```lua
+local mt = {
+  __add = function(a, b)
+    coroutine.yield(nil, "add")
+    return {value = a.value + b.value}
+  end
+}
+
+local function compute()
+  local a = setmetatable({value = 10}, mt)
+  local b = setmetatable({value = 20}, mt)
+  local c = a + b
+  return c.value
+end
+
+local co = coroutine.wrap(compute)
+local r1, op = co()  -- Yields from __add
+assert(op == "add")
+local result = co()  -- Completes
+assert(result == 30)
+```
+
+## To-Be-Closed Variables
+
+Coroutines interact with to-be-closed variables:
+
+```lua
+local function makeCloseable(fn)
+  return setmetatable({}, {__close = fn})
+end
+
+local closed = false
+
+local co = coroutine.create(function()
+  local x <close> = makeCloseable(function()
+    closed = true
+    print("Cleaning up")
+  end)
+  coroutine.yield(10)
+  return 20
+end)
+
+local s, v = coroutine.resume(co)
+assert(v == 10 and not closed)
+
+local s, v = coroutine.close(co)
+assert(s and closed)  -- __close called
+```
+
+## Yielding Across C Boundaries
+
+<Warning>
+Be careful when yielding across C function calls. Not all C functions support yielding.
+</Warning>
+
+```lua
+-- This works - table.sort allows yielding
+local co = coroutine.wrap(function()
+  local t = {3, 1, 4, 1, 5}
+  table.sort(t, function(a, b)
+    coroutine.yield(a, b)
+    return a < b
+  end)
+  return t
+end)
+
+-- Call multiple times to complete sorting
+while coroutine.status(co) ~= "dead" do
+  local a, b = co()
+  if a then
+    print("Comparing:", a, b)
+  end
+end
+```
+
+## Common Patterns
+
+### Generator Functions
+
+```lua
+local function fibonacci()
+  return coroutine.wrap(function()
+    local a, b = 0, 1
+    while true do
+      coroutine.yield(a)
+      a, b = b, a + b
+    end
+  end)
+end
+
+local fib = fibonacci()
+for i = 1, 10 do
+  print(fib())  -- 0, 1, 1, 2, 3, 5, 8, 13, 21, 34
+end
+```
+
+### Recursive Coroutines
+
+```lua
+local function permutations(arr, n)
+  n = n or #arr
+  return coroutine.wrap(function()
+    if n == 1 then
+      coroutine.yield(arr)
+    else
+      for i = 1, n do
+        arr[n], arr[i] = arr[i], arr[n]
+        for perm in permutations(arr, n - 1) do
+          coroutine.yield(perm)
+        end
+        arr[n], arr[i] = arr[i], arr[n]  -- Backtrack
+      end
+    end
+  end)
+end
+
+for perm in permutations({1, 2, 3}) do
+  -- Process each permutation
+end
+```
+
+## Debugging Coroutines
+
+```lua
+local debug = require("debug")
+
+local co = coroutine.create(function()
+  local a = 10
+  coroutine.yield()
+  return a + 20
+end)
+
+coroutine.resume(co)
+
+-- Inspect coroutine state
+local info = debug.getinfo(co, 1)
+print("Current line:", info.currentline)
+
+-- Get local variables
+local name, value = debug.getlocal(co, 0, 1)
+assert(name == "a" and value == 10)
+
+-- Get traceback
+local trace = debug.traceback(co)
+print(trace)
+```
+
+## Performance Considerations
+
+<Note>
+**Coroutine Performance Tips:**
+
+1. Coroutines have minimal overhead compared to full threads
+2. Yielding and resuming is fast but not free
+3. Avoid creating many short-lived coroutines
+4. Reuse coroutines when possible
+5. Be mindful of memory in long-running coroutines
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+<Card title="Functions" icon="function" href="./functions">
+Review function features and closures
+</Card>
+
+<Card title="Modules" icon="box" href="./modules">
+Organize code with modules
+</Card>
+
+<Card title="Metatables" icon="wand-magic-sparkles" href="./metatables">
+Customize behavior with metamethods
+</Card>
+
+<Card title="Control Flow" icon="code-branch" href="./control-flow">
+Review loops and conditionals
+</Card>
+</CardGroup>

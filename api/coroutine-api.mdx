@@ -1,0 +1,479 @@
+---
+title: 'Coroutine API'
+description: 'Coroutine creation, resumption, and control'
+---
+
+The coroutine library provides functions for creating and managing coroutines. Coroutines enable cooperative multitasking in Lua.
+
+## Coroutine Basics
+
+A coroutine is like a thread that can suspend its execution and later resume from the same point.
+
+## Creation
+
+<Accordion title="coroutine.create">
+Creates a new coroutine.
+
+```lua
+coroutine.create(f)
+```
+
+**Parameters:** Function to run in coroutine
+
+**Returns:** Coroutine object
+
+**Example:**
+```lua
+local co = coroutine.create(function()
+  print("Hello from coroutine")
+  coroutine.yield()
+  print("Resumed!")
+end)
+
+print(type(co))  -- "thread"
+```
+</Accordion>
+
+<Accordion title="coroutine.wrap">
+Creates a coroutine and returns a function to resume it.
+
+```lua
+coroutine.wrap(f)
+```
+
+**Returns:** Function that resumes coroutine
+
+**Example:**
+```lua
+local co = coroutine.wrap(function()
+  for i = 1, 3 do
+    print(i)
+    coroutine.yield()
+  end
+end)
+
+co()  -- Prints: 1
+co()  -- Prints: 2
+co()  -- Prints: 3
+```
+</Accordion>
+
+## Control
+
+<Accordion title="coroutine.resume">
+Resumes a coroutine.
+
+```lua
+coroutine.resume(co [, val1, ...])
+```
+
+**Returns:** Status (true/false), values
+
+**Example:**
+```lua
+local co = coroutine.create(function(a, b)
+  print("Args:", a, b)
+  local x = coroutine.yield("yielded value")
+  print("Resumed with:", x)
+  return "final value"
+end)
+
+-- First resume
+local ok, result = coroutine.resume(co, 10, 20)
+print(ok, result)  -- true  "yielded value"
+
+-- Second resume
+ok, result = coroutine.resume(co, "hello")
+print(ok, result)  -- true  "final value"
+```
+</Accordion>
+
+<Accordion title="coroutine.yield">
+Suspends execution of a coroutine.
+
+```lua
+coroutine.yield(...)
+```
+
+**Returns:** Values passed to resume
+
+**Example:**
+```lua
+local co = coroutine.create(function()
+  print("Starting")
+  local x = coroutine.yield("paused")
+  print("Got:", x)
+  return "done"
+end)
+
+coroutine.resume(co)  -- Prints: "Starting"
+coroutine.resume(co, 42)  -- Prints: "Got: 42"
+```
+</Accordion>
+
+## Status
+
+<Accordion title="coroutine.status">
+Returns the status of a coroutine.
+
+```lua
+coroutine.status(co)
+```
+
+**Returns:** `"running"`, `"suspended"`, `"normal"`, or `"dead"`
+
+**Example:**
+```lua
+local co = coroutine.create(function()
+  print(coroutine.status(co))  -- "running"
+  coroutine.yield()
+end)
+
+print(coroutine.status(co))  -- "suspended"
+coroutine.resume(co)
+print(coroutine.status(co))  -- "suspended"
+coroutine.resume(co)
+print(coroutine.status(co))  -- "dead"
+```
+</Accordion>
+
+<Accordion title="coroutine.running">
+Returns the running coroutine and a flag indicating if it's the main one.
+
+```lua
+coroutine.running()
+```
+
+**Returns:** Coroutine, is_main
+
+**Example:**
+```lua
+local co, ismain = coroutine.running()
+print(ismain)  -- true (if in main thread)
+
+local co = coroutine.create(function()
+  local current, ismain = coroutine.running()
+  print(ismain)  -- false
+  print(current == co)  -- true
+end)
+
+coroutine.resume(co)
+```
+</Accordion>
+
+<Accordion title="coroutine.isyieldable">
+Checks if the coroutine can yield.
+
+```lua
+coroutine.isyieldable([co])
+```
+
+**Returns:** true/false
+
+**Example:**
+```lua
+print(coroutine.isyieldable())  -- false (main thread)
+
+local co = coroutine.create(function()
+  print(coroutine.isyieldable())  -- true
+end)
+
+coroutine.resume(co)
+```
+</Accordion>
+
+<Accordion title="coroutine.close">
+Closes a coroutine.
+
+```lua
+coroutine.close(co)
+```
+
+**Returns:** true or nil + error
+
+**Example:**
+```lua
+local co = coroutine.create(function()
+  coroutine.yield()
+end)
+
+coroutine.resume(co)
+local ok, err = coroutine.close(co)
+print(ok)  -- true
+```
+</Accordion>
+
+## Practical Examples
+
+### Generator Pattern
+
+```lua
+function range(n)
+  return coroutine.wrap(function()
+    for i = 1, n do
+      coroutine.yield(i)
+    end
+  end)
+end
+
+-- Usage
+for i in range(5) do
+  print(i)
+end
+-- Output: 1 2 3 4 5
+
+-- Fibonacci generator
+function fibonacci()
+  return coroutine.wrap(function()
+    local a, b = 0, 1
+    while true do
+      coroutine.yield(a)
+      a, b = b, a + b
+    end
+  end)
+end
+
+local fib = fibonacci()
+for i = 1, 10 do
+  print(fib())
+end
+```
+
+### Producer-Consumer
+
+```lua
+local function producer()
+  return coroutine.create(function()
+    for i = 1, 5 do
+      print("Producing:", i)
+      coroutine.yield(i)
+    end
+  end)
+end
+
+local function consumer(prod)
+  while coroutine.status(prod) ~= "dead" do
+    local ok, value = coroutine.resume(prod)
+    if ok and value then
+      print("Consuming:", value)
+      -- Simulate processing
+    end
+  end
+end
+
+local prod = producer()
+consumer(prod)
+```
+
+### Iterator with State
+
+```lua
+function lines(str)
+  return coroutine.wrap(function()
+    local pos = 1
+    while pos <= #str do
+      local newpos = str:find("\n", pos) or #str + 1
+      coroutine.yield(str:sub(pos, newpos - 1))
+      pos = newpos + 1
+    end
+  end)
+end
+
+local text = "line1\nline2\nline3"
+for line in lines(text) do
+  print(line)
+end
+```
+
+### Cooperative Multitasking
+
+```lua
+local tasks = {}
+
+function spawn(fn)
+  local co = coroutine.create(fn)
+  table.insert(tasks, co)
+  return co
+end
+
+function scheduler()
+  while #tasks > 0 do
+    for i = #tasks, 1, -1 do
+      local co = tasks[i]
+      local ok, err = coroutine.resume(co)
+      
+      if not ok then
+        print("Task error:", err)
+        table.remove(tasks, i)
+      elseif coroutine.status(co) == "dead" then
+        table.remove(tasks, i)
+      end
+    end
+  end
+end
+
+-- Define tasks
+spawn(function()
+  for i = 1, 3 do
+    print("Task 1:", i)
+    coroutine.yield()
+  end
+end)
+
+spawn(function()
+  for i = 1, 3 do
+    print("Task 2:", i)
+    coroutine.yield()
+  end
+end)
+
+-- Run scheduler
+scheduler()
+```
+
+### Async/Await Pattern
+
+```lua
+local function async(fn)
+  return function(...)
+    local co = coroutine.create(fn)
+    local function step(...)
+      local ok, result = coroutine.resume(co, ...)
+      if not ok then
+        error(result)
+      end
+      return result
+    end
+    return step(...)
+  end
+end
+
+local function await(promise)
+  return coroutine.yield(promise)
+end
+
+-- Usage
+local fetchData = async(function()
+  print("Fetching data...")
+  local data = await(getData())  -- Simulated async operation
+  print("Got data:", data)
+  return data
+end)
+```
+
+### Pipeline Processing
+
+```lua
+function pipeline(...)
+  local stages = {...}
+  
+  return coroutine.wrap(function()
+    local input = coroutine.yield()
+    
+    while input do
+      local value = input
+      for _, stage in ipairs(stages) do
+        value = stage(value)
+      end
+      input = coroutine.yield(value)
+    end
+  end)
+end
+
+-- Create pipeline
+local proc = pipeline(
+  function(x) return x * 2 end,
+  function(x) return x + 10 end,
+  function(x) return tostring(x) end
+)
+
+-- Use pipeline
+proc()  -- Initialize
+print(proc(5))   -- "20"
+print(proc(10))  -- "30"
+```
+
+### State Machine
+
+```lua
+function stateMachine(states, initial)
+  return coroutine.wrap(function()
+    local current = initial
+    local input = nil
+    
+    while true do
+      local state = states[current]
+      if not state then
+        error("Invalid state: " .. tostring(current))
+      end
+      
+      current, input = state(input)
+      if not current then break end
+      
+      input = coroutine.yield(current)
+    end
+  end)
+end
+
+-- Define states
+local sm = stateMachine({
+  start = function()
+    print("Starting")
+    return "running"
+  end,
+  
+  running = function(input)
+    print("Running with:", input)
+    if input == "stop" then
+      return "stopped"
+    end
+    return "running"
+  end,
+  
+  stopped = function()
+    print("Stopped")
+    return nil  -- End state machine
+  end
+}, "start")
+
+-- Run state machine
+sm()  -- Initialize
+sm("continue")
+sm("stop")
+sm()
+```
+
+### Lazy Evaluation
+
+```lua
+function lazy(fn)
+  local co = coroutine.create(fn)
+  local started = false
+  
+  return function()
+    if not started then
+      started = true
+      coroutine.resume(co)
+    end
+    
+    local ok, value = coroutine.resume(co)
+    if ok then
+      return value
+    end
+  end
+end
+
+-- Lazy list
+function lazyList(list)
+  return lazy(function()
+    for _, v in ipairs(list) do
+      coroutine.yield(v)
+    end
+  end)
+end
+
+local numbers = lazyList{1, 2, 3, 4, 5}
+print(numbers())  -- 1
+print(numbers())  -- 2
+-- Only evaluates as needed
+```

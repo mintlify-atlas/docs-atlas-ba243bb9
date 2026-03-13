@@ -1,122 +1,146 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Lua",
+  "theme": "aspen",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#07077c",
+    "light": "#7c7cbc",
+    "dark": "#cccce4"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/14d7bc10-a2d4-4885-ac57-9afbf4b01a34.jpg",
+  "logo": {
+    "light": "https://media.brand.dev/a31ab90a-6b88-4ec7-a520-f1a271590043.png",
+    "dark": "https://media.brand.dev/a31ab90a-6b88-4ec7-a520-f1a271590043.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/lua/lua"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/lua/lua"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "features",
+              "installation",
+              "quickstart"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Language Guide",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "language/basics",
+              "language/data-types",
+              "language/control-flow",
+              "language/functions",
+              "language/tables",
+              "language/metatables",
+              "language/coroutines",
+              "language/modules"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Standard Libraries",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "libraries/overview",
+              "libraries/base",
+              "libraries/string",
+              "libraries/table",
+              "libraries/math",
+              "libraries/io",
+              "libraries/os",
+              "libraries/utf8",
+              "libraries/debug",
+              "libraries/package",
+              "libraries/coroutine"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "C API",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "c-api/overview",
+              "c-api/embedding",
+              "c-api/stack",
+              "c-api/calling-lua",
+              "c-api/registering-functions",
+              "c-api/userdata"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "advanced/memory-management",
+              "advanced/garbage-collection",
+              "advanced/error-handling",
+              "advanced/performance",
+              "advanced/building"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Core API",
             "pages": [
-              "api-reference/introduction"
+              "api/state-management",
+              "api/stack-manipulation",
+              "api/type-checking",
+              "api/value-access",
+              "api/arithmetic-comparison",
+              "api/push-functions",
+              "api/get-functions",
+              "api/set-functions",
+              "api/call-load",
+              "api/coroutine-functions",
+              "api/garbage-collection",
+              "api/miscellaneous"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Auxiliary Library",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/auxiliary-functions",
+              "api/buffer-manipulation",
+              "api/module-loading"
+            ]
+          },
+          {
+            "group": "Standard Library API",
+            "pages": [
+              "api/base-functions",
+              "api/string-functions",
+              "api/table-functions",
+              "api/math-functions",
+              "api/io-functions",
+              "api/os-functions",
+              "api/utf8-functions",
+              "api/debug-functions",
+              "api/package-functions",
+              "api/coroutine-api"
+            ]
+          },
+          {
+            "group": "Debug API",
+            "pages": [
+              "api/debug-interface",
+              "api/hooks"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

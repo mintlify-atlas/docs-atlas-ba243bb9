@@ -1,0 +1,327 @@
+---
+title: Embedding Lua
+description: How to embed Lua as a scripting language in C/C++ applications
+---
+
+## Introduction
+
+Embedding Lua means integrating the Lua interpreter into your C/C++ application. This allows your application to execute Lua scripts, providing scripting capabilities to end users or for internal configuration.
+
+## Basic Embedding
+
+<Steps>
+
+### Include Lua Headers
+
+Include the necessary Lua headers in your C source file:
+
+```c
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+```
+
+### Create a Lua State
+
+Create a new Lua state using the auxiliary library function:
+
+```c
+lua_State *L = luaL_newstate();
+if (L == NULL) {
+    fprintf(stderr, "Cannot create Lua state\n");
+    return 1;
+}
+```
+
+The `luaL_newstate()` function creates a new Lua state with the default memory allocator. It's defined in lauxlib.h:104.
+
+### Load Standard Libraries
+
+Open the standard Lua libraries:
+
+```c
+luaL_openlibs(L);
+```
+
+This loads all standard libraries: base, package, coroutine, string, table, math, io, os, and debug.
+
+### Execute Lua Code
+
+Execute a Lua script file:
+
+```c
+if (luaL_dofile(L, "script.lua") != LUA_OK) {
+    fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);  // Remove error message from stack
+}
+```
+
+Or execute a Lua string:
+
+```c
+if (luaL_dostring(L, "print('Hello from Lua!')") != LUA_OK) {
+    fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);
+}
+```
+
+### Close the Lua State
+
+When finished, close the Lua state to free resources:
+
+```c
+lua_close(L);
+```
+
+</Steps>
+
+## Complete Example
+
+Here's a complete example of embedding Lua:
+
+```c
+#include <stdio.h>
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+
+int main(void) {
+    lua_State *L;
+    
+    // Create Lua state
+    L = luaL_newstate();
+    if (L == NULL) {
+        fprintf(stderr, "Cannot create Lua state\n");
+        return 1;
+    }
+    
+    // Load standard libraries
+    luaL_openlibs(L);
+    
+    // Execute a Lua script
+    if (luaL_dostring(L, "print('Hello from Lua!')") != LUA_OK) {
+        fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+        lua_pop(L, 1);
+    }
+    
+    // Close Lua state
+    lua_close(L);
+    
+    return 0;
+}
+```
+
+## Advanced State Creation
+
+For more control over memory allocation, use `lua_newstate()` directly (lua.h:163):
+
+```c
+void *my_alloc_ud = NULL;  // User data for allocator
+
+lua_State *L = lua_newstate(my_allocator, my_alloc_ud, 12345);
+if (L == NULL) {
+    fprintf(stderr, "Cannot create Lua state\n");
+    return 1;
+}
+```
+
+You need to provide a custom allocator function:
+
+```c
+void *my_allocator(void *ud, void *ptr, size_t osize, size_t nsize) {
+    (void)ud; (void)osize;  // Not used in this example
+    
+    if (nsize == 0) {
+        free(ptr);  // Free memory
+        return NULL;
+    } else {
+        return realloc(ptr, nsize);  // Allocate/reallocate
+    }
+}
+```
+
+<Warning>
+The custom allocator must handle all allocation patterns correctly:
+- `ptr == NULL, nsize > 0`: allocate new block
+- `ptr != NULL, nsize > 0`: reallocate existing block
+- `ptr != NULL, nsize == 0`: free block
+- `ptr == NULL, nsize == 0`: does nothing
+</Warning>
+
+## Loading and Running Scripts
+
+### Loading from Files
+
+Load a Lua file without executing it:
+
+```c
+if (luaL_loadfile(L, "script.lua") != LUA_OK) {
+    fprintf(stderr, "Cannot load file: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);
+    return 1;
+}
+
+// The compiled chunk is now on the stack
+// Call it to execute
+if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
+    fprintf(stderr, "Runtime error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);
+    return 1;
+}
+```
+
+### Loading from Strings
+
+Load Lua code from a C string:
+
+```c
+const char *code = "return 2 + 2";
+
+if (luaL_loadstring(L, code) != LUA_OK) {
+    fprintf(stderr, "Syntax error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);
+    return 1;
+}
+
+if (lua_pcall(L, 0, 1, 0) != LUA_OK) {  // Expect 1 return value
+    fprintf(stderr, "Runtime error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);
+    return 1;
+}
+
+int result = lua_tointeger(L, -1);
+printf("Result: %d\n", result);  // Prints: Result: 4
+lua_pop(L, 1);
+```
+
+### Loading from Memory Buffers
+
+For loading from arbitrary memory buffers (lauxlib.h:100-101):
+
+```c
+const char *buffer = "print('Loaded from buffer')";
+size_t size = strlen(buffer);
+
+if (luaL_loadbufferx(L, buffer, size, "buffer", "t") != LUA_OK) {
+    fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);
+    return 1;
+}
+
+lua_pcall(L, 0, 0, 0);
+```
+
+The mode parameter ("t", "b", or "bt") controls whether text, binary, or both are accepted.
+
+## Communication with Lua
+
+### Setting Global Variables
+
+Pass data from C to Lua by setting global variables:
+
+```c
+lua_pushinteger(L, 42);
+lua_setglobal(L, "my_value");
+
+// Now Lua scripts can access: my_value
+luaL_dostring(L, "print(my_value)");  // Prints: 42
+```
+
+### Getting Global Variables
+
+Retrieve data from Lua global variables:
+
+```c
+luaL_dostring(L, "my_result = 10 * 5");
+
+lua_getglobal(L, "my_result");
+int result = lua_tointeger(L, -1);
+printf("Result: %d\n", result);  // Prints: Result: 50
+lua_pop(L, 1);
+```
+
+### Calling Lua Functions
+
+Call a Lua function from C:
+
+```c
+// Define a Lua function
+luaL_dostring(L, "function add(a, b) return a + b end");
+
+// Get the function
+lua_getglobal(L, "add");
+
+// Push arguments
+lua_pushinteger(L, 10);
+lua_pushinteger(L, 20);
+
+// Call: 2 arguments, 1 result
+if (lua_pcall(L, 2, 1, 0) != LUA_OK) {
+    fprintf(stderr, "Error: %s\n", lua_tostring(L, -1));
+    lua_pop(L, 1);
+} else {
+    int result = lua_tointeger(L, -1);
+    printf("Result: %d\n", result);  // Prints: Result: 30
+    lua_pop(L, 1);
+}
+```
+
+## Error Handling
+
+Always use `lua_pcall()` instead of `lua_call()` for robust error handling:
+
+```c
+int status = lua_pcall(L, nargs, nresults, 0);
+
+switch (status) {
+    case LUA_OK:
+        // Success
+        break;
+    case LUA_ERRRUN:
+        fprintf(stderr, "Runtime error: %s\n", lua_tostring(L, -1));
+        break;
+    case LUA_ERRMEM:
+        fprintf(stderr, "Memory allocation error\n");
+        break;
+    case LUA_ERRERR:
+        fprintf(stderr, "Error in error handler\n");
+        break;
+}
+
+if (status != LUA_OK) {
+    lua_pop(L, 1);  // Remove error message
+}
+```
+
+<Warning>
+Always check return values from Lua functions. The status codes are defined in lua.h:47-53.
+</Warning>
+
+## Compilation
+
+To compile programs that embed Lua:
+
+```bash
+# Link against the Lua library
+gcc -o myapp myapp.c -llua -lm
+
+# Or with explicit paths
+gcc -o myapp myapp.c -I/usr/include/lua5.5 -L/usr/lib -llua5.5 -lm
+```
+
+On some systems you may need to link the math library (`-lm`) and the dynamic linker library (`-ldl`).
+
+## Best Practices
+
+1. **Always check return values** - Lua functions can fail
+2. **Use `lua_pcall()` for safety** - Never use `lua_call()` in production
+3. **Clean up the stack** - Pop values when done to prevent stack overflow
+4. **Close the Lua state** - Free resources with `lua_close()`
+5. **Use auxiliary library** - Functions like `luaL_error()` provide better diagnostics
+
+## Next Steps
+
+- [The Stack](/c-api/stack) - Master stack manipulation
+- [Calling Lua](/c-api/calling-lua) - Advanced function calling techniques  
+- [Registering Functions](/c-api/registering-functions) - Expose C functions to Lua
+- [Userdata](/c-api/userdata) - Pass C objects to Lua

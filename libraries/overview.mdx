@@ -1,0 +1,59 @@
+---
+title: "Standard Libraries Overview"
+description: "Overview of Lua's standard libraries"
+---
+
+Lua provides a set of standard libraries that offer essential functionality for common programming tasks. These libraries are written in C and are part of the Lua distribution.
+
+## Available Libraries
+
+<CardGroup cols={2}>
+  <Card title="Base Library" href="/libraries/base">
+    Essential functions like print, type, assert, and error handling
+  </Card>
+  
+  <Card title="String Library" href="/libraries/string">
+    String manipulation and pattern matching functions
+  </Card>
+  
+  <Card title="Table Library" href="/libraries/table">
+    Functions for table manipulation and sorting
+  </Card>
+  
+  <Card title="Math Library" href="/libraries/math">
+    Mathematical functions and constants
+  </Card>
+  
+  <Card title="I/O Library" href="/libraries/io">
+    File input/output operations
+  </Card>
+  
+  <Card title="OS Library" href="/libraries/os">
+    Operating system facilities
+  </Card>
+  
+  <Card title="UTF-8 Library" href="/libraries/utf8">
+    UTF-8 encoding support
+  </Card>
+  
+  <Card title="Debug Library" href="/libraries/debug">
+    Debugging facilities and introspection
+  </Card>
+  
+  <Card title="Package Library" href="/libraries/package">
+    Module loading and package management
+  </Card>
+  
+  <Card title="Coroutine Library" href="/libraries/coroutine">
+    Coroutine manipulation functions
+  </Card>
+</CardGroup>
+
+## Library Design
+
+Most Lua libraries provide their functions in two ways:
+
+1. **As module functions** - Called with dot notation (e.g., `string.upper(s)`)
+2. **As methods** - Called with colon notation on objects (e.g., `s:upper()`)
+
+The string library, for example, sets its table as the metatable for all strings, allowing both calling styles.

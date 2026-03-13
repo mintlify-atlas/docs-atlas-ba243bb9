@@ -1,0 +1,240 @@
+---
+title: Type Checking
+description: Functions for checking types of values on the stack
+---
+
+## Overview
+
+These functions allow you to check the type of values on the Lua stack without converting them.
+
+## Functions
+
+### lua_isnumber
+
+Returns 1 if the value at the given index is a number or a string convertible to a number.
+
+```c
+int lua_isnumber(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index to check
+</ParamField>
+
+**Returns:** 1 if the value is a number or convertible to a number, 0 otherwise.
+
+**Example:**
+
+```c
+if (lua_isnumber(L, 1)) {
+    lua_Number num = lua_tonumber(L, 1);
+    printf("First argument is a number: %f\n", num);
+}
+```
+
+### lua_isstring
+
+Returns 1 if the value at the given index is a string or a number (which is always convertible to a string).
+
+```c
+int lua_isstring(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index to check
+</ParamField>
+
+**Returns:** 1 if the value is a string or number, 0 otherwise.
+
+**Example:**
+
+```c
+if (lua_isstring(L, 1)) {
+    const char *str = lua_tostring(L, 1);
+    printf("First argument: %s\n", str);
+}
+```
+
+### lua_iscfunction
+
+Returns 1 if the value at the given index is a C function.
+
+```c
+int lua_iscfunction(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index to check
+</ParamField>
+
+**Returns:** 1 if the value is a C function, 0 otherwise.
+
+**Example:**
+
+```c
+if (lua_iscfunction(L, -1)) {
+    lua_CFunction func = lua_tocfunction(L, -1);
+    printf("Top of stack is a C function\n");
+}
+```
+
+### lua_isinteger
+
+Returns 1 if the value at the given index is an integer.
+
+```c
+int lua_isinteger(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index to check
+</ParamField>
+
+**Returns:** 1 if the value is an integer, 0 otherwise.
+
+**Example:**
+
+```c
+if (lua_isinteger(L, 1)) {
+    lua_Integer num = lua_tointeger(L, 1);
+    printf("First argument is an integer: %lld\n", num);
+}
+```
+
+### lua_isuserdata
+
+Returns 1 if the value at the given index is a userdata (either full or light).
+
+```c
+int lua_isuserdata(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index to check
+</ParamField>
+
+**Returns:** 1 if the value is userdata, 0 otherwise.
+
+**Example:**
+
+```c
+if (lua_isuserdata(L, 1)) {
+    void *ud = lua_touserdata(L, 1);
+    printf("First argument is userdata\n");
+}
+```
+
+### lua_type
+
+Returns the type of the value at the given index.
+
+```c
+int lua_type(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index to check
+</ParamField>
+
+**Returns:** One of the following constants: `LUA_TNIL`, `LUA_TNUMBER`, `LUA_TBOOLEAN`, `LUA_TSTRING`, `LUA_TTABLE`, `LUA_TFUNCTION`, `LUA_TUSERDATA`, `LUA_TTHREAD`, `LUA_TLIGHTUSERDATA`, or `LUA_TNONE` for invalid indices.
+
+**Example:**
+
+```c
+int t = lua_type(L, 1);
+switch (t) {
+    case LUA_TSTRING:
+        printf("string: %s\n", lua_tostring(L, 1));
+        break;
+    case LUA_TNUMBER:
+        printf("number: %f\n", lua_tonumber(L, 1));
+        break;
+    case LUA_TBOOLEAN:
+        printf("boolean: %s\n", lua_toboolean(L, 1) ? "true" : "false");
+        break;
+    default:
+        printf("other type: %s\n", lua_typename(L, t));
+        break;
+}
+```
+
+### lua_typename
+
+Returns the name of the type encoded by the value `tp`.
+
+```c
+const char *lua_typename(lua_State *L, int tp);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="tp" type="int" required>
+  A type constant (e.g., `LUA_TSTRING`)
+</ParamField>
+
+**Returns:** The name of the type as a string.
+
+**Example:**
+
+```c
+int t = lua_type(L, 1);
+const char *typename = lua_typename(L, t);
+printf("Type of first argument: %s\n", typename);
+```
+
+## Helper Macros
+
+Lua provides several convenience macros built on top of `lua_type`:
+
+```c
+#define lua_isfunction(L,n)      (lua_type(L, (n)) == LUA_TFUNCTION)
+#define lua_istable(L,n)         (lua_type(L, (n)) == LUA_TTABLE)
+#define lua_islightuserdata(L,n) (lua_type(L, (n)) == LUA_TLIGHTUSERDATA)
+#define lua_isnil(L,n)           (lua_type(L, (n)) == LUA_TNIL)
+#define lua_isboolean(L,n)       (lua_type(L, (n)) == LUA_TBOOLEAN)
+#define lua_isthread(L,n)        (lua_type(L, (n)) == LUA_TTHREAD)
+#define lua_isnone(L,n)          (lua_type(L, (n)) == LUA_TNONE)
+#define lua_isnoneornil(L, n)    (lua_type(L, (n)) <= 0)
+```
+
+**Example:**
+
+```c
+if (lua_istable(L, 1)) {
+    printf("First argument is a table\n");
+}
+
+if (lua_isnil(L, 2)) {
+    printf("Second argument is nil\n");
+}
+
+if (lua_isnoneornil(L, 3)) {
+    printf("Third argument is missing or nil\n");
+}
+```

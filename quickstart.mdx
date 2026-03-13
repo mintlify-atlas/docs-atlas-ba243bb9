@@ -1,80 +1,544 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start Guide
+description: Get up and running with Lua in minutes - write your first programs and learn the basics
 ---
 
-## Get started in three steps
+## Your First Lua Program
 
-Get your documentation site running locally and make your first customization.
+Let's start with the traditional "Hello, World!" program.
 
-### Step 1: Set up your local environment
+<Steps>
+  <Step title="Create a file">
+    Create a new file called `hello.lua`:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```lua hello.lua
+    print("Hello, World!")
+    ```
+  </Step>
 
-### Step 2: Deploy your changes
+  <Step title="Run the program">
+    Execute your program:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash
+    lua hello.lua
+    ```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+    Output:
+    ```
+    Hello, World!
+    ```
+  </Step>
+</Steps>
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+The `print` function is part of Lua's base library and is always available. It automatically converts arguments to strings and adds a newline.
 </Note>
+
+## Interactive Exploration
+
+Lua's interactive mode (REPL) is perfect for learning and experimentation.
+
+```bash
+lua
+```
+
+Try these expressions:
+
+```lua
+> print("Hello!")
+Hello!
+
+> = 5 + 3
+8
+
+> = "Lua" .. " " .. "rocks!"
+Lua rocks!
+
+> = math.sqrt(16)
+4.0
+```
+
+<Note>
+In interactive mode, you can use `=` as a shortcut for `print()`. The expression `= value` is equivalent to `print(value)`.
+</Note>
+
+## Basic Syntax
+
+### Variables and Types
+
+Lua is dynamically typed - variables can hold any type of value:
+
+```lua variables.lua
+-- Numbers (integers and floats)
+local age = 25
+local pi = 3.14159
+local big = 1e10
+
+-- Strings
+local name = "Alice"
+local message = 'Hello, World!'
+local multiline = [[
+  This is a
+  multi-line string
+]]
+
+-- Booleans
+local is_active = true
+local is_complete = false
+
+-- Nil (represents absence of value)
+local nothing = nil
+
+-- Check types
+print(type(age))        -- number
+print(type(name))       -- string
+print(type(is_active))  -- boolean
+print(type(nothing))    -- nil
+```
+
+<Note>
+Always use `local` to declare variables unless you specifically need a global variable. Global variables can cause naming conflicts and are slower to access.
+</Note>
+
+### String Operations
+
+Lua provides powerful string manipulation:
+
+```lua strings.lua
+-- Concatenation
+local first = "Hello"
+local last = "World"
+local greeting = first .. " " .. last
+print(greeting)  -- Hello World
+
+-- String length
+print(#greeting)  -- 11
+
+-- String methods
+print(string.upper("hello"))     -- HELLO
+print(string.lower("WORLD"))     -- world
+print(string.sub("Lua", 1, 2))   -- Lu
+print(string.rep("Ha", 3))       -- HaHaHa
+
+-- Pattern matching
+local text = "The price is $25"
+local price = string.match(text, "%$(%d+)")
+print(price)  -- 25
+```
+
+### Control Structures
+
+#### If Statements
+
+```lua conditionals.lua
+local score = 85
+
+if score >= 90 then
+  print("Grade: A")
+elseif score >= 80 then
+  print("Grade: B")
+elseif score >= 70 then
+  print("Grade: C")
+else
+  print("Grade: F")
+end
+
+-- Logical operators: and, or, not
+local age = 25
+local has_license = true
+
+if age >= 18 and has_license then
+  print("Can drive")
+end
+```
+
+<Note>
+In Lua, only `false` and `nil` are considered false. Everything else, including `0` and empty strings, is true!
+</Note>
+
+#### Loops
+
+```lua loops.lua
+-- While loop
+local count = 1
+while count <= 5 do
+  print("Count: " .. count)
+  count = count + 1
+end
+
+-- Repeat-until loop (do-while)
+local num = 1
+repeat
+  print("Number: " .. num)
+  num = num + 1
+until num > 3
+
+-- For loop (numeric)
+for i = 1, 5 do
+  print("Iteration: " .. i)
+end
+
+-- For loop with step
+for i = 0, 10, 2 do
+  print(i)  -- 0, 2, 4, 6, 8, 10
+end
+
+-- For loop (generic) - iterate over values
+local fruits = {"apple", "banana", "cherry"}
+for index, fruit in ipairs(fruits) do
+  print(index, fruit)
+end
+```
+
+### Functions
+
+Functions are first-class values in Lua:
+
+```lua functions.lua
+-- Basic function
+local function greet(name)
+  return "Hello, " .. name .. "!"
+end
+
+print(greet("Alice"))  -- Hello, Alice!
+
+-- Multiple return values
+local function divide(a, b)
+  if b == 0 then
+    return nil, "Division by zero"
+  end
+  return a / b, nil
+end
+
+local result, err = divide(10, 2)
+if result then
+  print("Result:", result)  -- Result: 5.0
+else
+  print("Error:", err)
+end
+
+-- Variable number of arguments
+local function sum(...)
+  local total = 0
+  for _, value in ipairs({...}) do
+    total = total + value
+  end
+  return total
+end
+
+print(sum(1, 2, 3, 4, 5))  -- 15
+
+-- Anonymous functions
+local double = function(x) return x * 2 end
+print(double(5))  -- 10
+```
+
+### Tables
+
+Tables are Lua's only data structure, but they're incredibly versatile:
+
+```lua tables.lua
+-- Array-style table (1-indexed!)
+local numbers = {10, 20, 30, 40, 50}
+print(numbers[1])   -- 10
+print(numbers[5])   -- 50
+print(#numbers)     -- 5 (length)
+
+-- Dictionary-style table
+local person = {
+  name = "Bob",
+  age = 30,
+  city = "New York"
+}
+
+print(person.name)   -- Bob
+print(person["age"]) -- 30
+
+-- Add new fields
+person.email = "bob@example.com"
+person["phone"] = "555-1234"
+
+-- Nested tables
+local data = {
+  users = {
+    {name = "Alice", age = 25},
+    {name = "Bob", age = 30}
+  },
+  settings = {
+    theme = "dark",
+    language = "en"
+  }
+}
+
+print(data.users[1].name)  -- Alice
+
+-- Iterate over table
+for key, value in pairs(person) do
+  print(key .. ": " .. value)
+end
+```
+
+<Note>
+Lua tables are 1-indexed by convention. `table[1]` is the first element, not `table[0]`.
+</Note>
+
+## Practical Example: Word Counter
+
+Let's build a practical program that counts words in a text:
+
+```lua wordcount.lua
+-- Word counter program
+local function count_words(text)
+  local words = {}
+  local count = 0
+  
+  -- Split text into words
+  for word in string.gmatch(text, "%S+") do
+    count = count + 1
+    -- Convert to lowercase for case-insensitive counting
+    word = string.lower(word)
+    words[word] = (words[word] or 0) + 1
+  end
+  
+  return count, words
+end
+
+-- Test the function
+local text = [[
+  Lua is a powerful, efficient, lightweight scripting language.
+  Lua is designed for extending applications.
+  Lua is fast!
+]]
+
+local total, word_freq = count_words(text)
+
+print("Total words:", total)
+print("\nWord frequencies:")
+
+-- Sort and display most common words
+local sorted = {}
+for word, freq in pairs(word_freq) do
+  table.insert(sorted, {word = word, freq = freq})
+end
+
+table.sort(sorted, function(a, b) return a.freq > b.freq end)
+
+for i = 1, math.min(5, #sorted) do
+  print(string.format("%s: %d", sorted[i].word, sorted[i].freq))
+end
+```
+
+Run it:
+
+```bash
+lua wordcount.lua
+```
+
+Output:
+
+```
+Total words: 13
+
+Word frequencies:
+lua: 3
+is: 3
+efficient,: 1
+a: 1
+powerful,: 1
+```
+
+## Working with Files
+
+Reading and writing files is straightforward:
+
+```lua files.lua
+-- Write to a file
+local function write_file(filename, content)
+  local file = io.open(filename, "w")
+  if not file then
+    return nil, "Could not open file for writing"
+  end
+  file:write(content)
+  file:close()
+  return true
+end
+
+-- Read from a file
+local function read_file(filename)
+  local file = io.open(filename, "r")
+  if not file then
+    return nil, "Could not open file for reading"
+  end
+  local content = file:read("*all")
+  file:close()
+  return content
+end
+
+-- Usage
+write_file("test.txt", "Hello from Lua!\nThis is line 2.")
+
+local content, err = read_file("test.txt")
+if content then
+  print("File contents:")
+  print(content)
+else
+  print("Error:", err)
+end
+```
+
+## Error Handling
+
+Use `pcall` (protected call) for error handling:
+
+```lua errors.lua
+-- Function that might error
+local function risky_operation(x)
+  if x < 0 then
+    error("x must be non-negative")
+  end
+  return math.sqrt(x)
+end
+
+-- Safe call
+local success, result = pcall(risky_operation, 16)
+if success then
+  print("Result:", result)  -- Result: 4.0
+else
+  print("Error:", result)   -- result contains error message
+end
+
+-- This will catch the error
+local success, result = pcall(risky_operation, -5)
+if success then
+  print("Result:", result)
+else
+  print("Error caught:", result)  -- Error caught: x must be non-negative
+end
+```
+
+## Modules and Code Organization
+
+Create reusable modules:
+
+```lua math_utils.lua
+-- math_utils.lua
+local M = {}
+
+function M.add(a, b)
+  return a + b
+end
+
+function M.multiply(a, b)
+  return a * b
+end
+
+function M.average(...)
+  local args = {...}
+  local sum = 0
+  for _, v in ipairs(args) do
+    sum = sum + v
+  end
+  return sum / #args
+end
+
+return M
+```
+
+Use the module:
+
+```lua main.lua
+-- main.lua
+local math_utils = require("math_utils")
+
+print(math_utils.add(5, 3))         -- 8
+print(math_utils.multiply(4, 7))   -- 28
+print(math_utils.average(10, 20, 30))  -- 20.0
+```
+
+## Next Steps
+
+Congratulations! You now know the basics of Lua. Here's what to explore next:
+
+<CardGroup cols={2}>
+  <Card title="Standard Libraries" icon="book" href="/libraries">
+    Learn about Lua's built-in libraries
+  </Card>
+  <Card title="Advanced Features" icon="rocket" href="/advanced">
+    Metatables, coroutines, and more
+  </Card>
+  <Card title="C API" icon="code" href="/c-api">
+    Embed Lua in your applications
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="/language/basics">
+    Browse more code examples
+  </Card>
+</CardGroup>
+
+## Quick Reference
+
+### Common Operations
+
+```lua
+-- Comments
+-- Single line comment
+--[[ Multi-line
+     comment ]]
+
+-- Type checking
+type(value)              -- Returns type as string
+
+-- String concatenation
+"hello" .. " " .. "world"
+
+-- String length
+#"hello"                 -- 5
+
+-- Table length
+#table                   -- Number of array elements
+
+-- Iterate array
+for i, v in ipairs(array) do end
+
+-- Iterate table
+for k, v in pairs(table) do end
+
+-- Conditional operator (no ternary, use 'and'/'or')
+local result = condition and value1 or value2
+```
+
+### Useful Functions
+
+```lua
+-- Base library
+print(...)              -- Print values
+tonumber(str)           -- Convert to number
+tostring(val)           -- Convert to string
+type(val)               -- Get type
+pcall(func, ...)        -- Protected call
+require("module")       -- Load module
+
+-- String library
+string.len(s)
+string.sub(s, i, j)
+string.upper(s)
+string.lower(s)
+string.format(fmt, ...)
+string.match(s, pattern)
+
+-- Table library
+table.insert(t, val)
+table.remove(t, pos)
+table.sort(t, comp)
+table.concat(t, sep)
+
+-- Math library
+math.abs(x)
+math.ceil(x)
+math.floor(x)
+math.max(x, ...)
+math.min(x, ...)
+math.sqrt(x)
+math.random([m [, n]])
+```
+
+Happy coding with Lua!

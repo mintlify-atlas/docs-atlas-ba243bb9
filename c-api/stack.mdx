@@ -1,0 +1,425 @@
+---
+title: The Stack
+description: Understanding Lua's virtual stack for C-Lua communication
+---
+
+## Overview
+
+The **virtual stack** is the primary mechanism for exchanging values between C and Lua. All data transfer happens through this stack:
+
+- C code pushes values onto the stack
+- Lua functions receive arguments from the stack
+- Return values are left on the stack for C to retrieve
+- Tables are accessed by pushing/popping keys and values
+
+## Stack Indexing
+
+Stack positions can be referenced using two indexing schemes:
+
+### Positive Indices (From Bottom)
+
+Positive indices count from the bottom of the stack:
+
+```
+Stack:  [1] [2] [3] [4] <- top
+Index:   1   2   3   4
+```
+
+- Index 1 is the first element pushed
+- Index `n` is the nth element from the bottom
+
+### Negative Indices (From Top)
+
+Negative indices count from the top of the stack:
+
+```
+Stack:  [1] [2] [3] [4] <- top  
+Index:  -4  -3  -2  -1
+```
+
+- Index -1 is the top element
+- Index -2 is the second from top, etc.
+
+### Converting Indices
+
+Convert a relative index to an absolute index using `lua_absindex()` (lapi.c:167-171):
+
+```c
+int abs_index = lua_absindex(L, idx);
+```
+
+<Warning>
+Negative indices are relative to the current top. If the stack changes, negative indices refer to different elements!
+</Warning>
+
+## Stack Operations
+
+### Getting Stack Size
+
+Get the number of elements on the stack (lapi.c:174-176):
+
+```c
+int top = lua_gettop(L);
+printf("Stack has %d elements\n", top);
+```
+
+### Setting Stack Size
+
+Set the stack to a specific size (lapi.c:179-203):
+
+```c
+lua_settop(L, 0);    // Clear the stack
+lua_settop(L, 5);    // Expand to 5 elements (fills with nil)
+lua_settop(L, -2);   // Remove top element
+```
+
+The `lua_pop` macro is defined as (lua.h:396):
+
+```c
+#define lua_pop(L,n)  lua_settop(L, -(n)-1)
+```
+
+### Pushing Values
+
+Push a copy of an element onto the stack (lapi.c:268-273):
+
+```c
+lua_pushvalue(L, index);  // Duplicate element at index
+```
+
+### Removing Values
+
+Remove elements from the stack:
+
+```c
+lua_pop(L, 1);           // Remove top element
+lua_pop(L, n);           // Remove top n elements
+lua_remove(L, index);    // Remove element at index
+```
+
+### Rotating Stack Elements
+
+Rotate stack elements using `lua_rotate()` (lapi.c:238-250):
+
+```c
+// Rotate elements from index to top by n positions
+lua_rotate(L, index, n);
+
+// Insert element at top into position index
+lua_insert(L, index);  // Equivalent to lua_rotate(L, index, 1)
+```
+
+## Example: Stack Manipulation
+
+```c
+#include <stdio.h>
+#include <lua.h>
+#include <lauxlib.h>
+
+int main(void) {
+    lua_State *L = luaL_newstate();
+    
+    // Push some values
+    lua_pushinteger(L, 10);      // Stack: [10]
+    lua_pushinteger(L, 20);      // Stack: [10, 20]
+    lua_pushinteger(L, 30);      // Stack: [10, 20, 30]
+    
+    printf("Stack size: %d\n", lua_gettop(L));  // Prints: 3
+    
+    // Access by positive index
+    printf("Index 1: %lld\n", lua_tointeger(L, 1));  // Prints: 10
+    printf("Index 2: %lld\n", lua_tointeger(L, 2));  // Prints: 20
+    
+    // Access by negative index
+    printf("Index -1: %lld\n", lua_tointeger(L, -1)); // Prints: 30
+    printf("Index -2: %lld\n", lua_tointeger(L, -2)); // Prints: 20
+    
+    // Duplicate top element
+    lua_pushvalue(L, -1);        // Stack: [10, 20, 30, 30]
+    printf("Stack size: %d\n", lua_gettop(L));  // Prints: 4
+    
+    // Remove top two elements
+    lua_pop(L, 2);               // Stack: [10, 20]
+    printf("Stack size: %d\n", lua_gettop(L));  // Prints: 2
+    
+    // Clear stack
+    lua_settop(L, 0);            // Stack: []
+    printf("Stack size: %d\n", lua_gettop(L));  // Prints: 0
+    
+    lua_close(L);
+    return 0;
+}
+```
+
+## Push Functions (C → Stack)
+
+Push C values onto the Lua stack:
+
+### Basic Types
+
+```c
+void lua_pushnil(lua_State *L);
+void lua_pushboolean(lua_State *L, int b);
+void lua_pushinteger(lua_State *L, lua_Integer n);
+void lua_pushnumber(lua_State *L, lua_Number n);
+const char *lua_pushstring(lua_State *L, const char *s);
+const char *lua_pushlstring(lua_State *L, const char *s, size_t len);
+```
+
+Example:
+
+```c
+lua_pushnil(L);                    // Push nil
+lua_pushboolean(L, 1);             // Push true
+lua_pushinteger(L, 42);            // Push integer
+lua_pushnumber(L, 3.14);           // Push float
+lua_pushstring(L, "hello");        // Push string
+lua_pushlstring(L, "data", 4);     // Push string with length
+```
+
+### Formatted Strings
+
+Push formatted strings (lua.h:252):
+
+```c
+lua_pushfstring(L, "Value: %d, Name: %s", 42, "test");
+```
+
+### Functions and Closures
+
+Push C functions:
+
+```c
+lua_pushcfunction(L, my_function);           // No upvalues
+lua_pushcclosure(L, my_function, nup);       // With upvalues
+```
+
+### Light Userdata
+
+Push C pointers as light userdata (lapi.c:647-652):
+
+```c
+void *ptr = &my_data;
+lua_pushlightuserdata(L, ptr);
+```
+
+## Access Functions (Stack → C)
+
+Retrieve values from the stack:
+
+### Type Checking
+
+Check the type of a stack value (lapi.c:282-285):
+
+```c
+int type = lua_type(L, index);
+
+if (type == LUA_TNIL)        { /* ... */ }
+if (type == LUA_TBOOLEAN)    { /* ... */ }
+if (type == LUA_TNUMBER)     { /* ... */ }
+if (type == LUA_TSTRING)     { /* ... */ }
+if (type == LUA_TTABLE)      { /* ... */ }
+if (type == LUA_TFUNCTION)   { /* ... */ }
+if (type == LUA_TUSERDATA)   { /* ... */ }
+```
+
+Convenience macros (lua.h:404-411):
+
+```c
+if (lua_isnil(L, index))      { /* ... */ }
+if (lua_isboolean(L, index))  { /* ... */ }
+if (lua_isnumber(L, index))   { /* ... */ }
+if (lua_isstring(L, index))   { /* ... */ }
+if (lua_istable(L, index))    { /* ... */ }
+if (lua_isfunction(L, index)) { /* ... */ }
+```
+
+### Retrieving Values
+
+Convert stack values to C types:
+
+```c
+int b = lua_toboolean(L, index);              // Get boolean
+lua_Integer i = lua_tointeger(L, index);      // Get integer
+lua_Number n = lua_tonumber(L, index);        // Get number
+const char *s = lua_tostring(L, index);       // Get string
+size_t len;
+const char *s = lua_tolstring(L, index, &len); // Get string with length
+```
+
+<Warning>
+These functions do **not** remove the value from the stack. They only read it. Use `lua_pop()` to remove values.
+</Warning>
+
+### Safe Conversion
+
+Check if conversion succeeded:
+
+```c
+int isnum;
+lua_Integer i = lua_tointegerx(L, index, &isnum);
+if (!isnum) {
+    fprintf(stderr, "Not an integer\n");
+}
+
+lua_Number n = lua_tonumberx(L, index, &isnum);
+if (!isnum) {
+    fprintf(stderr, "Not a number\n");
+}
+```
+
+## Stack Size Management
+
+### Minimum Stack Size
+
+Lua guarantees a minimum stack size of `LUA_MINSTACK` (20) slots (lua.h:79):
+
+```c
+#define LUA_MINSTACK  20
+```
+
+For operations needing more space, check and grow the stack:
+
+```c
+if (!lua_checkstack(L, extra)) {
+    fprintf(stderr, "Cannot grow stack\n");
+    return;
+}
+```
+
+The implementation is in lapi.c:109-123.
+
+### Example: Safe Stack Growth
+
+```c
+// Need to push 100 elements
+if (!lua_checkstack(L, 100)) {
+    return luaL_error(L, "stack overflow");
+}
+
+for (int i = 0; i < 100; i++) {
+    lua_pushinteger(L, i);
+}
+```
+
+## Pseudo-Indices
+
+Some special indices don't correspond to stack positions:
+
+### Registry
+
+The registry is a global table for C code (lua.h:43):
+
+```c
+#define LUA_REGISTRYINDEX  (-(INT_MAX/2 + 1000))
+
+// Access registry
+lua_pushstring(L, "my_key");
+lua_pushinteger(L, 42);
+lua_settable(L, LUA_REGISTRYINDEX);
+```
+
+### Upvalues
+
+Access upvalues in C closures (lua.h:44):
+
+```c
+#define lua_upvalueindex(i)  (LUA_REGISTRYINDEX - (i))
+
+// Get upvalue 1 in current C function
+lua_pushvalue(L, lua_upvalueindex(1));
+```
+
+## Common Patterns
+
+### Pattern 1: Reading Multiple Values
+
+```c
+// Assume stack has: [value1, value2, value3]
+lua_Integer v1 = lua_tointeger(L, -3);
+lua_Integer v2 = lua_tointeger(L, -2);
+lua_Integer v3 = lua_tointeger(L, -1);
+lua_pop(L, 3);
+```
+
+### Pattern 2: Building a Table
+
+```c
+lua_newtable(L);                // Create table: [{}]
+
+lua_pushstring(L, "key1");      // [table, "key1"]
+lua_pushinteger(L, 100);        // [table, "key1", 100]
+lua_settable(L, -3);            // [table]  (table.key1 = 100)
+
+lua_pushstring(L, "key2");      // [table, "key2"]
+lua_pushstring(L, "value");     // [table, "key2", "value"]
+lua_settable(L, -3);            // [table]  (table.key2 = "value")
+
+// Table with both keys is now on stack top
+```
+
+### Pattern 3: Error with Stack Cleanup
+
+```c
+lua_pushinteger(L, 1);
+lua_pushinteger(L, 2);
+lua_pushinteger(L, 3);
+
+if (error_condition) {
+    lua_settop(L, original_top);  // Restore stack
+    return luaL_error(L, "error occurred");
+}
+```
+
+## Best Practices
+
+1. **Track stack balance** - Every push should have a corresponding pop
+2. **Use negative indices for recent values** - More readable and safer
+3. **Check stack space** - Use `lua_checkstack()` for large operations
+4. **Document stack state** - Add comments showing stack contents
+5. **Handle errors properly** - Clean up stack before raising errors
+
+<Warning>
+Stack overflow causes undefined behavior. Always ensure you have enough space before pushing values.
+</Warning>
+
+## Debugging Stack Contents
+
+Helper function to print stack contents:
+
+```c
+void dump_stack(lua_State *L) {
+    int top = lua_gettop(L);
+    printf("Stack size: %d\n", top);
+    
+    for (int i = 1; i <= top; i++) {
+        int type = lua_type(L, i);
+        printf("  [%d] %s: ", i, lua_typename(L, type));
+        
+        switch (type) {
+            case LUA_TNUMBER:
+                printf("%g", lua_tonumber(L, i));
+                break;
+            case LUA_TSTRING:
+                printf("%s", lua_tostring(L, i));
+                break;
+            case LUA_TBOOLEAN:
+                printf("%s", lua_toboolean(L, i) ? "true" : "false");
+                break;
+            case LUA_TNIL:
+                printf("nil");
+                break;
+            default:
+                printf("%p", lua_topointer(L, i));
+                break;
+        }
+        printf("\n");
+    }
+}
+```
+
+## Next Steps
+
+- [Calling Lua](/c-api/calling-lua) - Call Lua functions from C
+- [Registering Functions](/c-api/registering-functions) - Expose C functions to Lua
+- [Userdata](/c-api/userdata) - Manage C objects through the stack

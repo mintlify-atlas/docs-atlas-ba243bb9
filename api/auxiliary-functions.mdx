@@ -1,0 +1,381 @@
+---
+title: 'Auxiliary Functions'
+description: 'Core auxiliary library functions for building Lua libraries'
+---
+
+The auxiliary library provides helper functions for common operations when building Lua libraries and applications. These functions simplify error checking, type validation, and stack management.
+
+## Type Checking
+
+<Accordion title="luaL_checktype">
+Checks whether the function argument at index `arg` has type `t`.
+
+```c
+void luaL_checktype (lua_State *L, int arg, int t);
+```
+
+**Parameters:**
+- `arg` - Stack index of the argument
+- `t` - Expected type (e.g., `LUA_TTABLE`, `LUA_TFUNCTION`)
+
+**Example:**
+```lua
+-- C function that requires a table argument
+function acceptOnlyTable(tbl)
+  -- luaL_checktype(L, 1, LUA_TTABLE) ensures tbl is a table
+end
+```
+</Accordion>
+
+<Accordion title="luaL_checkany">
+Checks whether the function has an argument of any type at position `arg`.
+
+```c
+void luaL_checkany (lua_State *L, int arg);
+```
+
+**Parameters:**
+- `arg` - Stack index to check
+
+**Example:**
+```lua
+function processValue(value)
+  -- Ensures at least one argument was passed
+end
+```
+</Accordion>
+
+<Accordion title="luaL_checklstring">
+Checks whether the function argument at index `arg` is a string and returns this string.
+
+```c
+const char *luaL_checklstring (lua_State *L, int arg, size_t *len);
+```
+
+**Parameters:**
+- `arg` - Stack index of the argument
+- `len` - Pointer to store the string length (can be NULL)
+
+**Returns:** Pointer to the string
+
+**Example:**
+```lua
+function printLength(str)
+  -- Gets string and its length
+  print(#str)
+end
+```
+</Accordion>
+
+<Accordion title="luaL_checkinteger">
+Checks whether the function argument at index `arg` is an integer and returns this integer.
+
+```c
+lua_Integer luaL_checkinteger (lua_State *L, int arg);
+```
+
+**Parameters:**
+- `arg` - Stack index of the argument
+
+**Returns:** The integer value
+
+**Example:**
+```lua
+function square(n)
+  return n * n
+end
+
+square(5)  -- Returns 25
+```
+</Accordion>
+
+<Accordion title="luaL_checknumber">
+Checks whether the function argument at index `arg` is a number and returns this number.
+
+```c
+lua_Number luaL_checknumber (lua_State *L, int arg);
+```
+
+**Parameters:**
+- `arg` - Stack index of the argument
+
+**Returns:** The number value
+
+**Example:**
+```lua
+function computeSine(angle)
+  return math.sin(angle)
+end
+```
+</Accordion>
+
+<Accordion title="luaL_checkudata">
+Checks whether the function argument at index `arg` is a userdata of the type `tname`.
+
+```c
+void *luaL_checkudata (lua_State *L, int arg, const char *tname);
+```
+
+**Parameters:**
+- `arg` - Stack index of the argument
+- `tname` - Metatable name
+
+**Returns:** Pointer to the userdata
+</Accordion>
+
+## Optional Arguments
+
+<Accordion title="luaL_optinteger">
+If the function argument at index `arg` is an integer, returns this integer. If absent or nil, returns `def`.
+
+```c
+lua_Integer luaL_optinteger (lua_State *L, int arg, lua_Integer def);
+```
+
+**Example:**
+```lua
+function repeat(str, times)
+  times = times or 1  -- Default to 1
+  return string.rep(str, times)
+end
+```
+</Accordion>
+
+<Accordion title="luaL_optnumber">
+If the function argument at index `arg` is a number, returns this number. If absent or nil, returns `def`.
+
+```c
+lua_Number luaL_optnumber (lua_State *L, int arg, lua_Number def);
+```
+</Accordion>
+
+<Accordion title="luaL_optlstring">
+If the function argument at index `arg` is a string, returns this string. If absent or nil, returns `def`.
+
+```c
+const char *luaL_optlstring (lua_State *L, int arg, const char *def, size_t *len);
+```
+</Accordion>
+
+## Error Handling
+
+<Accordion title="luaL_argerror">
+Raises an error reporting a problem with argument `arg` of the function that called it.
+
+```c
+int luaL_argerror (lua_State *L, int arg, const char *extramsg);
+```
+
+**Example:**
+```lua
+function divide(a, b)
+  if b == 0 then
+    error("division by zero", 2)
+  end
+  return a / b
+end
+```
+</Accordion>
+
+<Accordion title="luaL_typeerror">
+Raises a type error for the argument `arg` of the function that called it.
+
+```c
+int luaL_typeerror (lua_State *L, int arg, const char *tname);
+```
+</Accordion>
+
+<Accordion title="luaL_error">
+Raises an error with a formatted message.
+
+```c
+int luaL_error (lua_State *L, const char *fmt, ...);
+```
+
+**Example:**
+```lua
+function validateAge(age)
+  if age < 0 then
+    error("age must be non-negative")
+  end
+end
+```
+</Accordion>
+
+## Stack and References
+
+<Accordion title="luaL_checkstack">
+Grows the stack size to accommodate `sz` extra elements, raising an error if the stack cannot grow.
+
+```c
+void luaL_checkstack (lua_State *L, int sz, const char *msg);
+```
+</Accordion>
+
+<Accordion title="luaL_ref">
+Creates and returns a reference in the table at index `t` for the object at the top of the stack.
+
+```c
+int luaL_ref (lua_State *L, int t);
+```
+
+**Returns:** Reference index
+</Accordion>
+
+<Accordion title="luaL_unref">
+Releases the reference `ref` from the table at index `t`.
+
+```c
+void luaL_unref (lua_State *L, int t, int ref);
+```
+</Accordion>
+
+## Metatables
+
+<Accordion title="luaL_newmetatable">
+Creates a new metatable with the given name and registers it in the registry.
+
+```c
+int luaL_newmetatable (lua_State *L, const char *tname);
+```
+
+**Returns:** 1 if created, 0 if already exists
+</Accordion>
+
+<Accordion title="luaL_setmetatable">
+Sets the metatable of the object at the top of the stack to the metatable associated with `tname`.
+
+```c
+void luaL_setmetatable (lua_State *L, const char *tname);
+```
+</Accordion>
+
+<Accordion title="luaL_getmetafield">
+Pushes onto the stack the field `e` from the metatable of the object at index `obj`.
+
+```c
+int luaL_getmetafield (lua_State *L, int obj, const char *e);
+```
+</Accordion>
+
+<Accordion title="luaL_callmeta">
+Calls a metamethod.
+
+```c
+int luaL_callmeta (lua_State *L, int obj, const char *e);
+```
+</Accordion>
+
+## Loading Code
+
+<Accordion title="luaL_loadfile">
+Loads a file as a Lua chunk.
+
+```c
+int luaL_loadfile (lua_State *L, const char *filename);
+```
+
+**Returns:** Status code (`LUA_OK` on success)
+
+**Example:**
+```lua
+loadfile("config.lua")()
+```
+</Accordion>
+
+<Accordion title="luaL_loadstring">
+Loads a string as a Lua chunk.
+
+```c
+int luaL_loadstring (lua_State *L, const char *s);
+```
+
+**Example:**
+```lua
+load("return 2 + 2")()
+```
+</Accordion>
+
+<Accordion title="luaL_dofile">
+Loads and runs a file.
+
+```c
+int luaL_dofile (lua_State *L, const char *filename);
+```
+
+**Example:**
+```lua
+dofile("init.lua")
+```
+</Accordion>
+
+<Accordion title="luaL_dostring">
+Loads and runs a string.
+
+```c
+int luaL_dostring (lua_State *L, const char *s);
+```
+</Accordion>
+
+## Module Loading
+
+<Accordion title="luaL_requiref">
+Loads a module and stores it in the package.loaded table.
+
+```c
+void luaL_requiref (lua_State *L, const char *modname,
+                    lua_CFunction openf, int glb);
+```
+
+**Parameters:**
+- `modname` - Module name
+- `openf` - Opening function
+- `glb` - Whether to store in global table
+
+**Example:**
+```lua
+require("math")
+require("string")
+```
+</Accordion>
+
+## Utility Functions
+
+<Accordion title="luaL_len">
+Returns the "length" of the value at the given index as a number.
+
+```c
+lua_Integer luaL_len (lua_State *L, int idx);
+```
+</Accordion>
+
+<Accordion title="luaL_tolstring">
+Converts any Lua value at the given index to a C string.
+
+```c
+const char *luaL_tolstring (lua_State *L, int idx, size_t *len);
+```
+</Accordion>
+
+<Accordion title="luaL_gsub">
+Performs string substitution.
+
+```c
+const char *luaL_gsub (lua_State *L, const char *s,
+                       const char *p, const char *r);
+```
+
+**Parameters:**
+- `s` - Source string
+- `p` - Pattern to find
+- `r` - Replacement string
+</Accordion>
+
+<Accordion title="luaL_traceback">
+Creates and pushes a traceback of the stack L1.
+
+```c
+void luaL_traceback (lua_State *L, lua_State *L1,
+                     const char *msg, int level);
+```
+</Accordion>

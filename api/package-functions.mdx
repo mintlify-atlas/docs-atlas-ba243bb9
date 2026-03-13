@@ -1,0 +1,455 @@
+---
+title: 'Package Functions'
+description: 'Module loading and package management'
+---
+
+The package library provides facilities for loading and managing Lua modules. It implements the module system used by `require`.
+
+## Module Loading
+
+<Accordion title="require">
+Loads and returns a module.
+
+```lua
+require(modname)
+```
+
+**Returns:** Module value (typically a table)
+
+**Example:**
+```lua
+-- Load standard libraries
+local math = require("math")
+local string = require("string")
+
+-- Load custom module
+local mymodule = require("mymodule")
+mymodule.someFunction()
+
+-- Module is cached
+local m1 = require("mymodule")
+local m2 = require("mymodule")
+print(m1 == m2)  -- true (same table)
+```
+</Accordion>
+
+## Search Path
+
+<Accordion title="package.path">
+The path used to search for Lua modules.
+
+```lua
+package.path
+```
+
+**Format:** Semicolon-separated paths with `?` as placeholder
+
+**Example:**
+```lua
+-- View current path
+print(package.path)
+-- ./?.lua;/usr/local/share/lua/5.4/?.lua;...
+
+-- Add custom path
+package.path = package.path .. ";/my/modules/?.lua"
+
+-- Add multiple paths
+package.path = "./?.lua;./lib/?.lua;" .. package.path
+
+-- Common pattern for project-local modules
+package.path = "./src/?.lua;./lib/?.lua;" .. package.path
+```
+</Accordion>
+
+<Accordion title="package.cpath">
+The path used to search for C modules.
+
+```lua
+package.cpath
+```
+
+**Example:**
+```lua
+print(package.cpath)
+-- ./?.so;/usr/local/lib/lua/5.4/?.so;...
+
+-- Add custom C module path
+package.cpath = package.cpath .. ";/my/cmodules/?.so"
+```
+</Accordion>
+
+<Accordion title="package.searchpath">
+Searches for a file in a path.
+
+```lua
+package.searchpath(name, path [, sep [, rep]])
+```
+
+**Parameters:**
+- `name` - Module name
+- `path` - Search path
+- `sep` - Separator in name (default: ".")
+- `rep` - Replacement in path (default: system separator)
+
+**Returns:** Filename or nil + error message
+
+**Example:**
+```lua
+local file = package.searchpath("mymodule", package.path)
+if file then
+  print("Found:", file)
+else
+  print("Not found")
+end
+
+-- Search for submodule
+local file = package.searchpath("mylib.submodule", package.path)
+-- Looks for: mylib/submodule.lua
+```
+</Accordion>
+
+## Module Cache
+
+<Accordion title="package.loaded">
+Table of loaded modules.
+
+```lua
+package.loaded
+```
+
+**Example:**
+```lua
+-- Check if module is loaded
+if package.loaded["mymodule"] then
+  print("Module already loaded")
+end
+
+-- Force reload by removing from cache
+package.loaded["mymodule"] = nil
+local m = require("mymodule")  -- Loads fresh copy
+
+-- Manually register a module
+package.loaded["mymodule"] = {version = "1.0"}
+local m = require("mymodule")
+print(m.version)  -- "1.0"
+
+-- List all loaded modules
+for name, module in pairs(package.loaded) do
+  print(name, type(module))
+end
+```
+</Accordion>
+
+<Accordion title="package.preload">
+Table of loader functions for modules.
+
+```lua
+package.preload
+```
+
+**Example:**
+```lua
+-- Preload a module without a file
+package.preload["mymodule"] = function()
+  return {
+    version = "1.0",
+    hello = function() print("Hello!") end
+  }
+end
+
+local m = require("mymodule")  -- Uses preload function
+m.hello()  -- "Hello!"
+
+-- Embed modules in your application
+package.preload["embedded.config"] = function()
+  return {
+    database = "localhost",
+    port = 5432
+  }
+end
+```
+</Accordion>
+
+## Searchers
+
+<Accordion title="package.searchers">
+Array of searcher functions for `require`.
+
+```lua
+package.searchers
+```
+
+**Default searchers:**
+1. `package.preload`
+2. Lua module searcher
+3. C module searcher
+4. All-in-one C searcher
+
+**Example:**
+```lua
+-- View searchers
+for i, searcher in ipairs(package.searchers) do
+  print(i, searcher)
+end
+
+-- Add custom searcher
+table.insert(package.searchers, function(modname)
+  if modname:match("^http://") then
+    -- Load module from URL
+    local content = downloadFile(modname)
+    return load(content)
+  end
+  return "\n\tno HTTP loader"
+end)
+
+-- Custom searcher for compiled modules
+table.insert(package.searchers, function(modname)
+  local file = package.searchpath(modname, "./compiled/?.luac")
+  if file then
+    return loadfile(file)
+  end
+end)
+```
+</Accordion>
+
+## C Module Loading
+
+<Accordion title="package.loadlib">
+Loads a C library.
+
+```lua
+package.loadlib(libname, funcname)
+```
+
+**Returns:** C function or nil + error message
+
+**Example:**
+```lua
+local func = package.loadlib("mylib.so", "luaopen_mylib")
+if func then
+  local module = func()  -- Initialize module
+else
+  print("Failed to load library")
+end
+```
+</Accordion>
+
+## Configuration
+
+<Accordion title="package.config">
+Configuration string for package system.
+
+```lua
+package.config
+```
+
+**Format (5 lines):**
+1. Directory separator (`/` or `\`)
+2. Path separator (`;`)
+3. Template mark (`?`)
+4. Substitution point (`!`)
+5. Ignore mark (`-`)
+
+**Example:**
+```lua
+local config = package.config
+local dirsep = config:match("^(.-) \n")
+print("Directory separator:", dirsep)
+
+-- Parse all config values
+local lines = {}
+for line in package.config:gmatch("[^\n]+") do
+  table.insert(lines, line)
+end
+print("Dir sep:", lines[1])
+print("Path sep:", lines[2])
+print("Template:", lines[3])
+```
+</Accordion>
+
+## Practical Examples
+
+### Module Template
+
+```lua
+-- mymodule.lua
+local M = {}
+
+M.VERSION = "1.0.0"
+
+local function privateFunction()
+  return "private"
+end
+
+function M.publicFunction()
+  return "public"
+end
+
+function M.usePrivate()
+  return privateFunction()
+end
+
+return M
+
+-- Usage:
+-- local mymodule = require("mymodule")
+-- print(mymodule.VERSION)
+-- mymodule.publicFunction()
+```
+
+### Hot Module Reloading
+
+```lua
+function reload(modname)
+  -- Unload module
+  package.loaded[modname] = nil
+  
+  -- Remove from cache
+  for k in pairs(package.loaded) do
+    if k:match("^" .. modname) then
+      package.loaded[k] = nil
+    end
+  end
+  
+  -- Reload
+  return require(modname)
+end
+
+-- Usage
+local m = reload("mymodule")
+```
+
+### Lazy Loading
+
+```lua
+local LazyLoader = {}
+
+function LazyLoader.new(modules)
+  local loaded = {}
+  
+  return setmetatable({}, {
+    __index = function(t, key)
+      if modules[key] then
+        if not loaded[key] then
+          loaded[key] = require(modules[key])
+        end
+        return loaded[key]
+      end
+    end
+  })
+end
+
+-- Usage
+local libs = LazyLoader.new{
+  json = "json",
+  http = "socket.http",
+  xml = "xmlparser"
+}
+
+-- Modules only loaded when accessed
+local data = libs.json.decode('{"x":1}')
+```
+
+### Module Namespace
+
+```lua
+local Namespace = {}
+
+function Namespace.new(prefix)
+  local ns = {
+    prefix = prefix,
+    modules = {}
+  }
+  
+  setmetatable(ns, {
+    __index = function(t, key)
+      local modname = prefix .. "." .. key
+      if not t.modules[key] then
+        t.modules[key] = require(modname)
+      end
+      return t.modules[key]
+    end
+  })
+  
+  return ns
+end
+
+-- Usage
+local myapp = Namespace.new("myapp")
+local db = myapp.database
+local utils = myapp.utils
+-- Requires "myapp.database" and "myapp.utils"
+```
+
+### Version Checking
+
+```lua
+function requireVersion(modname, minVersion)
+  local module = require(modname)
+  
+  if not module.VERSION then
+    error("Module has no version information")
+  end
+  
+  local function parseVersion(v)
+    local major, minor, patch = v:match("(%d+)%.(%d+)%.(%d+)")
+    return {tonumber(major), tonumber(minor), tonumber(patch)}
+  end
+  
+  local current = parseVersion(module.VERSION)
+  local required = parseVersion(minVersion)
+  
+  for i = 1, 3 do
+    if current[i] < required[i] then
+      error(string.format(
+        "Module %s version %s is older than required %s",
+        modname, module.VERSION, minVersion
+      ))
+    elseif current[i] > required[i] then
+      break
+    end
+  end
+  
+  return module
+end
+
+-- Usage
+local mylib = requireVersion("mylib", "2.1.0")
+```
+
+### Dependency Injection
+
+```lua
+local Container = {}
+Container.registry = {}
+
+function Container.register(name, factory)
+  Container.registry[name] = {factory = factory, instance = nil}
+end
+
+function Container.get(name)
+  local entry = Container.registry[name]
+  if not entry then
+    error("Service not registered: " .. name)
+  end
+  
+  if not entry.instance then
+    entry.instance = entry.factory()
+  end
+  
+  return entry.instance
+end
+
+-- Register services
+Container.register("database", function()
+  return require("myapp.database").new()
+end)
+
+Container.register("cache", function()
+  local db = Container.get("database")
+  return require("myapp.cache").new(db)
+end)
+
+-- Use services
+local cache = Container.get("cache")
+```

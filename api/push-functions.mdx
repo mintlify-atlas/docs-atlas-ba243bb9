@@ -1,0 +1,371 @@
+---
+title: Push Functions
+description: Functions for pushing values from C onto the Lua stack
+---
+
+## Overview
+
+These functions push values from C onto the Lua stack, making them available to Lua code.
+
+## Functions
+
+### lua_pushnil
+
+Pushes a nil value onto the stack.
+
+```c
+void lua_pushnil(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+lua_pushnil(L);
+// Stack: nil
+```
+
+### lua_pushnumber
+
+Pushes a floating-point number onto the stack.
+
+```c
+void lua_pushnumber(lua_State *L, lua_Number n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="n" type="lua_Number" required>
+  The number to push
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+lua_pushnumber(L, 3.14159);
+lua_pushnumber(L, 42.0);
+// Stack: 3.14159, 42.0
+```
+
+### lua_pushinteger
+
+Pushes an integer onto the stack.
+
+```c
+void lua_pushinteger(lua_State *L, lua_Integer n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="n" type="lua_Integer" required>
+  The integer to push
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+lua_pushinteger(L, 42);
+lua_pushinteger(L, -100);
+// Stack: 42, -100
+```
+
+### lua_pushstring
+
+Pushes a zero-terminated string onto the stack.
+
+```c
+const char *lua_pushstring(lua_State *L, const char *s);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="s" type="const char*" required>
+  The string to push (can be `NULL`)
+</ParamField>
+
+**Returns:** A pointer to the internal copy of the string.
+
+**Example:**
+
+```c
+lua_pushstring(L, "Hello, World!");
+lua_pushstring(L, NULL); // Pushes nil
+// Stack: "Hello, World!", nil
+```
+
+### lua_pushlstring
+
+Pushes a string with an explicit length onto the stack.
+
+```c
+const char *lua_pushlstring(lua_State *L, const char *s, size_t len);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="s" type="const char*" required>
+  The string to push
+</ParamField>
+
+<ParamField path="len" type="size_t" required>
+  The length of the string in bytes
+</ParamField>
+
+**Returns:** A pointer to the internal copy of the string.
+
+**Example:**
+
+```c
+// Push a string containing null bytes
+const char *data = "Hello\0World";
+lua_pushlstring(L, data, 11);
+// Stack: "Hello\0World" (full 11 bytes)
+```
+
+### lua_pushexternalstring
+
+Pushes an externally managed string onto the stack.
+
+```c
+const char *lua_pushexternalstring(lua_State *L, const char *s, size_t len,
+                                   lua_Alloc falloc, void *ud);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="s" type="const char*" required>
+  The string pointer
+</ParamField>
+
+<ParamField path="len" type="size_t" required>
+  The length of the string
+</ParamField>
+
+<ParamField path="falloc" type="lua_Alloc" required>
+  Allocator function to free the string
+</ParamField>
+
+<ParamField path="ud" type="void*" required>
+  User data for the allocator
+</ParamField>
+
+**Returns:** A pointer to the string.
+
+**Example:**
+
+```c
+char *external = malloc(100);
+strcpy(external, "External string");
+lua_pushexternalstring(L, external, strlen(external), my_alloc, NULL);
+```
+
+### lua_pushfstring
+
+Pushes a formatted string onto the stack.
+
+```c
+const char *lua_pushfstring(lua_State *L, const char *fmt, ...);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="fmt" type="const char*" required>
+  The format string
+</ParamField>
+
+<ParamField path="..." type="variadic">
+  Format arguments
+</ParamField>
+
+**Returns:** A pointer to the formatted string.
+
+**Note:** Format specifiers: `%%` (%), `%s` (string), `%d` (int), `%I` (lua_Integer), `%f` (lua_Number), `%p` (pointer), `%c` (char), `%U` (UTF-8 code point).
+
+**Example:**
+
+```c
+lua_pushfstring(L, "Value: %d, Name: %s", 42, "test");
+// Stack: "Value: 42, Name: test"
+```
+
+### lua_pushvfstring
+
+Pushes a formatted string using a `va_list`.
+
+```c
+const char *lua_pushvfstring(lua_State *L, const char *fmt, va_list argp);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="fmt" type="const char*" required>
+  The format string
+</ParamField>
+
+<ParamField path="argp" type="va_list" required>
+  Variable argument list
+</ParamField>
+
+**Returns:** A pointer to the formatted string.
+
+**Example:**
+
+```c
+void push_formatted(lua_State *L, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    lua_pushvfstring(L, fmt, args);
+    va_end(args);
+}
+```
+
+### lua_pushboolean
+
+Pushes a boolean value onto the stack.
+
+```c
+void lua_pushboolean(lua_State *L, int b);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="b" type="int" required>
+  The boolean value (0 for false, non-zero for true)
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+lua_pushboolean(L, 1); // true
+lua_pushboolean(L, 0); // false
+// Stack: true, false
+```
+
+### lua_pushlightuserdata
+
+Pushes a light userdata onto the stack.
+
+```c
+void lua_pushlightuserdata(lua_State *L, void *p);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="p" type="void*" required>
+  The pointer to push
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+MyStruct *data = get_data();
+lua_pushlightuserdata(L, data);
+// Stack: lightuserdata(data)
+```
+
+### lua_pushcclosure
+
+Pushes a C closure onto the stack.
+
+```c
+void lua_pushcclosure(lua_State *L, lua_CFunction fn, int n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="fn" type="lua_CFunction" required>
+  The C function
+</ParamField>
+
+<ParamField path="n" type="int" required>
+  The number of upvalues (values from the stack to associate with the function)
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+int my_function(lua_State *L) {
+    // Access upvalue
+    int upval = lua_tointeger(L, lua_upvalueindex(1));
+    lua_pushinteger(L, upval * 2);
+    return 1;
+}
+
+// Create a closure with one upvalue
+lua_pushinteger(L, 42);
+lua_pushcclosure(L, my_function, 1);
+// Stack: function (with upvalue 42)
+```
+
+### lua_pushthread
+
+Pushes the current thread onto the stack.
+
+```c
+int lua_pushthread(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+**Returns:** 1 if this thread is the main thread, 0 otherwise.
+
+**Example:**
+
+```c
+int is_main = lua_pushthread(L);
+if (is_main) {
+    printf("Running in main thread\n");
+}
+// Stack: thread
+```
+
+## Helper Macros
+
+```c
+#define lua_pushcfunction(L,f)  lua_pushcclosure(L, (f), 0)
+#define lua_pushliteral(L, s)   lua_pushstring(L, "" s)
+```
+
+**Example:**
+
+```c
+lua_pushcfunction(L, my_function);
+lua_pushliteral(L, "Hello");
+```

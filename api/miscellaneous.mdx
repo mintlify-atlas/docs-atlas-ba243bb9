@@ -1,0 +1,450 @@
+---
+title: Miscellaneous Functions
+description: Other useful API functions
+---
+
+## Overview
+
+These are additional utility functions for error handling, table iteration, string manipulation, and memory management.
+
+## Error Handling
+
+### lua_error
+
+Generates a Lua error using the value on top of the stack as the error object.
+
+```c
+int lua_error(lua_State *L);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+**Returns:** Never returns. This function performs a long jump.
+
+**Example:**
+
+```c
+int my_function(lua_State *L) {
+    if (!lua_isnumber(L, 1)) {
+        lua_pushstring(L, "Expected a number");
+        return lua_error(L);  // Raises error
+    }
+    
+    double value = lua_tonumber(L, 1);
+    if (value < 0) {
+        return luaL_error(L, "Value must be non-negative, got %f", value);
+    }
+    
+    lua_pushnumber(L, sqrt(value));
+    return 1;
+}
+```
+
+## Table Iteration
+
+### lua_next
+
+Pops a key from the stack and pushes the next key-value pair from the table.
+
+```c
+int lua_next(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the table
+</ParamField>
+
+**Returns:** 1 if there are more pairs, 0 if there are no more elements.
+
+**Example:**
+
+```c
+void print_table(lua_State *L, int idx) {
+    lua_pushnil(L);  // First key
+    
+    while (lua_next(L, idx) != 0) {
+        // Stack: ... table ... key value
+        
+        // Print key
+        printf("Key: ");
+        if (lua_isstring(L, -2)) {
+            printf("%s", lua_tostring(L, -2));
+        } else if (lua_isnumber(L, -2)) {
+            printf("%f", lua_tonumber(L, -2));
+        }
+        
+        // Print value
+        printf(", Value: ");
+        if (lua_isstring(L, -1)) {
+            printf("%s\n", lua_tostring(L, -1));
+        } else if (lua_isnumber(L, -1)) {
+            printf("%f\n", lua_tonumber(L, -1));
+        } else {
+            printf("%s\n", lua_typename(L, lua_type(L, -1)));
+        }
+        
+        // Remove value, keep key for next iteration
+        lua_pop(L, 1);
+    }
+}
+```
+
+## String Operations
+
+### lua_concat
+
+Concatenates the n values at the top of the stack.
+
+```c
+void lua_concat(lua_State *L, int n);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="n" type="int" required>
+  Number of values to concatenate
+</ParamField>
+
+**Returns:** Nothing. Pushes the result onto the stack.
+
+**Example:**
+
+```c
+lua_pushstring(L, "Hello");
+lua_pushstring(L, " ");
+lua_pushstring(L, "World");
+lua_concat(L, 3);
+// Stack now has: "Hello World"
+
+// Concatenate numbers and strings
+lua_pushstring(L, "Value: ");
+lua_pushinteger(L, 42);
+lua_concat(L, 2);
+// Stack: "Value: 42"
+```
+
+### lua_len
+
+Returns the length of the value at the given index.
+
+```c
+void lua_len(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+**Returns:** Nothing. Pushes the length onto the stack.
+
+**Example:**
+
+```c
+lua_getglobal(L, "myarray");
+lua_len(L, -1);
+int len = lua_tointeger(L, -1);
+lua_pop(L, 1);
+printf("Array length: %d\n", len);
+```
+
+### lua_stringtonumber
+
+Converts a string to a number and pushes it onto the stack.
+
+```c
+size_t lua_stringtonumber(lua_State *L, const char *s);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="s" type="const char*" required>
+  The string to convert
+</ParamField>
+
+**Returns:** The length of the string if conversion succeeded, 0 otherwise.
+
+**Example:**
+
+```c
+size_t len = lua_stringtonumber(L, "42.5");
+if (len > 0) {
+    double num = lua_tonumber(L, -1);
+    printf("Converted: %f\n", num);
+    lua_pop(L, 1);
+} else {
+    printf("Conversion failed\n");
+}
+```
+
+### lua_numbertocstring
+
+Converts a number at the given index to a string.
+
+```c
+unsigned lua_numbertocstring(lua_State *L, int idx, char *buff);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the number
+</ParamField>
+
+<ParamField path="buff" type="char*" required>
+  Buffer to store the result (must be at least `LUA_N2SBUFFSZ` bytes)
+</ParamField>
+
+**Returns:** The length of the resulting string.
+
+**Example:**
+
+```c
+lua_pushnumber(L, 3.14159);
+char buffer[LUA_N2SBUFFSZ];
+unsigned len = lua_numbertocstring(L, -1, buffer);
+printf("Number as string: %s (length: %u)\n", buffer, len);
+```
+
+## Memory Management
+
+### lua_getallocf
+
+Returns the memory allocation function and user data for a given state.
+
+```c
+lua_Alloc lua_getallocf(lua_State *L, void **ud);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="ud" type="void**">
+  Pointer to store the user data pointer (can be `NULL`)
+</ParamField>
+
+**Returns:** The allocation function.
+
+**Example:**
+
+```c
+void *ud;
+lua_Alloc allocf = lua_getallocf(L, &ud);
+printf("Got allocator function: %p\n", (void*)allocf);
+printf("User data: %p\n", ud);
+```
+
+### lua_setallocf
+
+Changes the allocator function of a given state.
+
+```c
+void lua_setallocf(lua_State *L, lua_Alloc f, void *ud);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="f" type="lua_Alloc" required>
+  The new allocation function
+</ParamField>
+
+<ParamField path="ud" type="void*" required>
+  User data to pass to the allocator
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+void* my_alloc(void *ud, void *ptr, size_t osize, size_t nsize) {
+    if (nsize == 0) {
+        free(ptr);
+        return NULL;
+    }
+    return realloc(ptr, nsize);
+}
+
+lua_setallocf(L, my_alloc, NULL);
+```
+
+## To-Be-Closed Variables
+
+### lua_toclose
+
+Marks the value at the given index as to-be-closed.
+
+```c
+void lua_toclose(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index of the value
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+int open_file(lua_State *L) {
+    const char *filename = luaL_checkstring(L, 1);
+    FILE **pf = (FILE **)lua_newuserdatauv(L, sizeof(FILE*), 0);
+    
+    *pf = fopen(filename, "r");
+    if (*pf == NULL) {
+        return luaL_error(L, "Cannot open file: %s", filename);
+    }
+    
+    // Set metatable with __close method
+    luaL_getmetatable(L, "File");
+    lua_setmetatable(L, -2);
+    
+    // Mark as to-be-closed
+    lua_toclose(L, -1);
+    
+    return 1;
+}
+```
+
+### lua_closeslot
+
+Closes the to-be-closed slot at the given index.
+
+```c
+void lua_closeslot(lua_State *L, int idx);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="idx" type="int" required>
+  The stack index
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+// Manually close a to-be-closed variable
+lua_closeslot(L, -1);
+```
+
+## Warning Functions
+
+### lua_warning
+
+Emits a warning with a given message.
+
+```c
+void lua_warning(lua_State *L, const char *msg, int tocont);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="msg" type="const char*" required>
+  The warning message
+</ParamField>
+
+<ParamField path="tocont" type="int" required>
+  1 if this is a continuation of the previous warning, 0 otherwise
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+lua_warning(L, "This feature is deprecated", 0);
+lua_warning(L, "Use the new API instead", 1);
+```
+
+### lua_setwarnf
+
+Sets the warning function.
+
+```c
+void lua_setwarnf(lua_State *L, lua_WarnFunction f, void *ud);
+```
+
+<ParamField path="L" type="lua_State*" required>
+  The Lua state
+</ParamField>
+
+<ParamField path="f" type="lua_WarnFunction" required>
+  The warning function
+</ParamField>
+
+<ParamField path="ud" type="void*" required>
+  User data passed to the warning function
+</ParamField>
+
+**Returns:** Nothing.
+
+**Example:**
+
+```c
+void my_warn(void *ud, const char *msg, int tocont) {
+    if (!tocont) {
+        fprintf(stderr, "Warning: ");
+    }
+    fprintf(stderr, "%s", msg);
+    if (!tocont) {
+        fprintf(stderr, "\n");
+    }
+}
+
+lua_setwarnf(L, my_warn, NULL);
+```
+
+## Complete Example: Safe Table Iteration with Error Handling
+
+```c
+int sum_table_values(lua_State *L) {
+    if (!lua_istable(L, 1)) {
+        lua_pushstring(L, "Argument must be a table");
+        return lua_error(L);
+    }
+    
+    double sum = 0.0;
+    lua_pushnil(L);
+    
+    while (lua_next(L, 1) != 0) {
+        if (lua_isnumber(L, -1)) {
+            sum += lua_tonumber(L, -1);
+        } else {
+            lua_warning(L, "Skipping non-numeric value", 0);
+        }
+        lua_pop(L, 1);
+    }
+    
+    lua_pushnumber(L, sum);
+    return 1;
+}
+```

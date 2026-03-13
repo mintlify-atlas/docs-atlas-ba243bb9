@@ -1,0 +1,535 @@
+---
+title: Registering C Functions
+description: How to make C functions callable from Lua scripts
+---
+
+## Overview
+
+Registering C functions allows Lua scripts to call your C code. This is essential for:
+
+- Extending Lua with new functionality
+- Exposing application APIs to scripts
+- Implementing performance-critical operations in C
+- Integrating with external libraries
+
+## C Function Signature
+
+All C functions callable from Lua must follow this signature (lua.h:106):
+
+```c
+typedef int (*lua_CFunction)(lua_State *L);
+```
+
+The function:
+- Receives a `lua_State *L` pointer
+- Gets arguments from the stack (starting at index 1)
+- Pushes return values onto the stack
+- Returns the number of return values
+
+## Simple Example
+
+Here's a complete example:
+
+```c
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+
+// C function that adds two numbers
+static int my_add(lua_State *L) {
+    // Get arguments from stack
+    lua_Number a = luaL_checknumber(L, 1);
+    lua_Number b = luaL_checknumber(L, 2);
+    
+    // Compute result
+    lua_Number result = a + b;
+    
+    // Push result onto stack
+    lua_pushnumber(L, result);
+    
+    // Return number of results
+    return 1;
+}
+
+int main(void) {
+    lua_State *L = luaL_newstate();
+    luaL_openlibs(L);
+    
+    // Register the function
+    lua_register(L, "add", my_add);
+    
+    // Call from Lua
+    luaL_dostring(L, "print('5 + 3 =', add(5, 3))");
+    
+    lua_close(L);
+    return 0;
+}
+```
+
+Output:
+```
+5 + 3 = 8
+```
+
+## Registering Functions
+
+### Method 1: lua_register Macro
+
+The simplest method (lua.h:400):
+
+```c
+#define lua_register(L,n,f) (lua_pushcfunction(L, (f)), lua_setglobal(L, (n)))
+
+lua_register(L, "myfunction", my_c_function);
+```
+
+This creates a global function visible to all Lua code.
+
+### Method 2: Direct Registration
+
+Manually push and set:
+
+```c
+lua_pushcfunction(L, my_c_function);
+lua_setglobal(L, "myfunction");
+```
+
+### Method 3: Register in a Table
+
+Organize functions in a namespace:
+
+```c
+lua_newtable(L);                         // Create table
+lua_pushcfunction(L, my_func1);          // Push function
+lua_setfield(L, -2, "func1");            // table.func1 = my_func1
+lua_pushcfunction(L, my_func2);          // Push function
+lua_setfield(L, -2, "func2");            // table.func2 = my_func2
+lua_setglobal(L, "mylib");               // mylib = table
+
+// Now call as: mylib.func1(), mylib.func2()
+```
+
+## Getting Arguments
+
+<Steps>
+
+### Check Argument Count
+
+Ensure enough arguments are provided:
+
+```c
+int nargs = lua_gettop(L);
+if (nargs < 2) {
+    return luaL_error(L, "expected at least 2 arguments, got %d", nargs);
+}
+```
+
+### Use Check Functions
+
+The auxiliary library provides type-checking functions (lauxlib.h:55-64):
+
+```c
+lua_Integer i = luaL_checkinteger(L, 1);   // Check and get integer
+lua_Number n = luaL_checknumber(L, 2);     // Check and get number
+const char *s = luaL_checkstring(L, 3);    // Check and get string
+
+// These raise errors if the type is wrong
+```
+
+### Use Optional Functions
+
+Provide default values for optional arguments:
+
+```c
+lua_Integer i = luaL_optinteger(L, 1, 0);        // Default: 0
+lua_Number n = luaL_optnumber(L, 2, 1.0);        // Default: 1.0
+const char *s = luaL_optstring(L, 3, "default"); // Default: "default"
+```
+
+### Manual Type Checking
+
+Check types manually:
+
+```c
+if (!lua_isnumber(L, 1)) {
+    return luaL_typeerror(L, 1, "number");
+}
+lua_Number n = lua_tonumber(L, 1);
+```
+
+</Steps>
+
+## Returning Values
+
+Push return values onto the stack and return the count:
+
+### Single Return Value
+
+```c
+static int get_version(lua_State *L) {
+    lua_pushstring(L, "1.0.0");
+    return 1;  // One return value
+}
+```
+
+### Multiple Return Values
+
+```c
+static int get_dimensions(lua_State *L) {
+    lua_pushinteger(L, 1920);  // width
+    lua_pushinteger(L, 1080);  // height
+    return 2;  // Two return values
+}
+
+-- Lua usage:
+local w, h = get_dimensions()
+```
+
+### No Return Value
+
+```c
+static int do_something(lua_State *L) {
+    // ... do work ...
+    return 0;  // No return values
+}
+```
+
+### Variable Return Values
+
+```c
+static int get_values(lua_State *L) {
+    int count = luaL_checkinteger(L, 1);
+    
+    for (int i = 0; i < count; i++) {
+        lua_pushinteger(L, i);
+    }
+    
+    return count;  // Return 'count' values
+}
+```
+
+## Example: String Manipulation
+
+```c
+// Function that reverses a string
+static int reverse_string(lua_State *L) {
+    size_t len;
+    const char *str = luaL_checklstring(L, 1, &len);
+    
+    // Allocate buffer for reversed string
+    char *reversed = malloc(len + 1);
+    if (!reversed) {
+        return luaL_error(L, "out of memory");
+    }
+    
+    // Reverse the string
+    for (size_t i = 0; i < len; i++) {
+        reversed[i] = str[len - 1 - i];
+    }
+    reversed[len] = '\0';
+    
+    // Push result and free buffer
+    lua_pushstring(L, reversed);
+    free(reversed);
+    
+    return 1;
+}
+
+// Register and use
+lua_register(L, "reverse", reverse_string);
+luaL_dostring(L, "print(reverse('hello'));");  // Prints: olleh
+```
+
+## Example: Table Operations
+
+```c
+// Function that sums all numbers in a table
+static int sum_table(lua_State *L) {
+    luaL_checktype(L, 1, LUA_TTABLE);
+    
+    lua_Number sum = 0;
+    size_t len = lua_rawlen(L, 1);
+    
+    for (size_t i = 1; i <= len; i++) {
+        lua_rawgeti(L, 1, i);          // Get table[i]
+        if (lua_isnumber(L, -1)) {
+            sum += lua_tonumber(L, -1);
+        }
+        lua_pop(L, 1);                 // Pop value
+    }
+    
+    lua_pushnumber(L, sum);
+    return 1;
+}
+
+// Usage in Lua
+/*
+function test()
+    local t = {10, 20, 30, 40}
+    print("Sum:", sum_table(t))  -- Prints: Sum: 100
+end
+*/
+```
+
+## Error Handling
+
+### Using luaL_error
+
+Raise an error with a formatted message (lauxlib.h:76):
+
+```c
+static int divide(lua_State *L) {
+    lua_Number a = luaL_checknumber(L, 1);
+    lua_Number b = luaL_checknumber(L, 2);
+    
+    if (b == 0) {
+        return luaL_error(L, "division by zero");
+    }
+    
+    lua_pushnumber(L, a / b);
+    return 1;
+}
+```
+
+<Warning>
+`luaL_error()` does not return. It performs a longjmp to the nearest protected call. Do not use `return` after calling it (though it's safe to do so for clarity).
+</Warning>
+
+### Using luaL_argerror
+
+Report argument errors (lauxlib.h:53):
+
+```c
+static int check_positive(lua_State *L) {
+    lua_Integer n = luaL_checkinteger(L, 1);
+    
+    if (n <= 0) {
+        return luaL_argerror(L, 1, "expected positive number");
+    }
+    
+    lua_pushinteger(L, n * 2);
+    return 1;
+}
+```
+
+## Library Registration
+
+Register multiple functions as a library using `luaL_Reg` (lauxlib.h:38-41):
+
+```c
+// Define functions
+static int mylib_add(lua_State *L) {
+    lua_Number a = luaL_checknumber(L, 1);
+    lua_Number b = luaL_checknumber(L, 2);
+    lua_pushnumber(L, a + b);
+    return 1;
+}
+
+static int mylib_sub(lua_State *L) {
+    lua_Number a = luaL_checknumber(L, 1);
+    lua_Number b = luaL_checknumber(L, 2);
+    lua_pushnumber(L, a - b);
+    return 1;
+}
+
+static int mylib_mul(lua_State *L) {
+    lua_Number a = luaL_checknumber(L, 1);
+    lua_Number b = luaL_checknumber(L, 2);
+    lua_pushnumber(L, a * b);
+    return 1;
+}
+
+// Create registration array
+static const luaL_Reg mylib[] = {
+    {"add", mylib_add},
+    {"sub", mylib_sub},
+    {"mul", mylib_mul},
+    {NULL, NULL}  // Sentinel
+};
+
+// Registration function
+int luaopen_mylib(lua_State *L) {
+    luaL_newlib(L, mylib);
+    return 1;
+}
+
+// Register the library
+int main(void) {
+    lua_State *L = luaL_newstate();
+    luaL_openlibs(L);
+    
+    luaL_requiref(L, "mylib", luaopen_mylib, 1);
+    lua_pop(L, 1);
+    
+    luaL_dostring(L, "print(mylib.add(5, 3))");  // Prints: 8
+    
+    lua_close(L);
+    return 0;
+}
+```
+
+The `luaL_newlib()` macro (lauxlib.h:135-136) creates a table and registers all functions.
+
+## Upvalues (Closures)
+
+Upvalues allow C functions to have associated data:
+
+```c
+static int counter(lua_State *L) {
+    // Get upvalue (the counter)
+    lua_Integer count = lua_tointeger(L, lua_upvalueindex(1));
+    
+    // Increment
+    count++;
+    
+    // Update upvalue
+    lua_pushinteger(L, count);
+    lua_replace(L, lua_upvalueindex(1));
+    
+    // Return current count
+    lua_pushinteger(L, count);
+    return 1;
+}
+
+// Create closure with upvalue
+lua_pushinteger(L, 0);                    // Initial count
+lua_pushcclosure(L, counter, 1);          // 1 upvalue
+lua_setglobal(L, "counter");
+
+// Each call increments the counter
+luaL_dostring(L, "print(counter())");     // Prints: 1
+luaL_dostring(L, "print(counter())");     // Prints: 2
+luaL_dostring(L, "print(counter())");     // Prints: 3
+```
+
+The `lua_upvalueindex(i)` macro (lua.h:44) returns a pseudo-index for accessing upvalue `i`.
+
+## Advanced Example: Object-Oriented Interface
+
+```c
+typedef struct {
+    int x;
+    int y;
+} Point;
+
+static int point_new(lua_State *L) {
+    int x = luaL_checkinteger(L, 1);
+    int y = luaL_checkinteger(L, 2);
+    
+    Point *p = lua_newuserdata(L, sizeof(Point));
+    p->x = x;
+    p->y = y;
+    
+    luaL_setmetatable(L, "Point");
+    return 1;
+}
+
+static int point_distance(lua_State *L) {
+    Point *p = luaL_checkudata(L, 1, "Point");
+    lua_Number dist = sqrt(p->x * p->x + p->y * p->y);
+    lua_pushnumber(L, dist);
+    return 1;
+}
+
+static int point_tostring(lua_State *L) {
+    Point *p = luaL_checkudata(L, 1, "Point");
+    lua_pushfstring(L, "Point(%d, %d)", p->x, p->y);
+    return 1;
+}
+
+static const luaL_Reg point_methods[] = {
+    {"distance", point_distance},
+    {NULL, NULL}
+};
+
+static const luaL_Reg point_meta[] = {
+    {"__tostring", point_tostring},
+    {NULL, NULL}
+};
+
+int luaopen_point(lua_State *L) {
+    // Create metatable
+    luaL_newmetatable(L, "Point");
+    luaL_setfuncs(L, point_meta, 0);
+    
+    // Methods go in metatable.__index
+    lua_newtable(L);
+    luaL_setfuncs(L, point_methods, 0);
+    lua_setfield(L, -2, "__index");
+    
+    // Create library table
+    lua_newtable(L);
+    lua_pushcfunction(L, point_new);
+    lua_setfield(L, -2, "new");
+    
+    return 1;
+}
+```
+
+Usage:
+
+```lua
+local point = require("point")
+local p = point.new(3, 4)
+print(p)  -- Point(3, 4)
+print(p:distance())  -- 5.0
+```
+
+## Best Practices
+
+1. **Always check arguments** - Use `luaL_check*()` functions
+2. **Provide good error messages** - Help users understand what went wrong
+3. **Document required arguments** - Be clear about function signatures
+4. **Clean up resources** - Free allocated memory before returning
+5. **Use upvalues for state** - Instead of global variables
+6. **Organize into libraries** - Use `luaL_Reg` for multiple functions
+7. **Handle errors gracefully** - Use `luaL_error()` for exceptional cases
+
+<Warning>
+Memory allocated in C functions must be freed before returning or raising errors. Lua's garbage collector does not manage C-allocated memory.
+</Warning>
+
+## Common Pitfalls
+
+### Forgetting to Return Count
+
+```c
+// WRONG
+static int bad_function(lua_State *L) {
+    lua_pushinteger(L, 42);
+    // Missing: return 1;
+}
+
+// CORRECT
+static int good_function(lua_State *L) {
+    lua_pushinteger(L, 42);
+    return 1;
+}
+```
+
+### Not Checking Stack Space
+
+```c
+// WRONG - may overflow stack
+static int bad_function(lua_State *L) {
+    for (int i = 0; i < 10000; i++) {
+        lua_pushinteger(L, i);
+    }
+    return 10000;
+}
+
+// CORRECT
+static int good_function(lua_State *L) {
+    lua_checkstack(L, 10000);
+    for (int i = 0; i < 10000; i++) {
+        lua_pushinteger(L, i);
+    }
+    return 10000;
+}
+```
+
+## Next Steps
+
+- [Userdata](/c-api/userdata) - Manage complex C objects in Lua
+- [The Stack](/c-api/stack) - Master stack manipulation techniques
+- [Calling Lua](/c-api/calling-lua) - Call Lua functions from C

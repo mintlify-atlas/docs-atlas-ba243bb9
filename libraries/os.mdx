@@ -1,0 +1,432 @@
+---
+title: "OS Library"
+description: "Operating system facilities"
+---
+
+The OS library provides operating system facilities including date/time manipulation, environment variables, and file system operations.
+
+## Date and Time
+
+<CardGroup cols={2}>
+  <Card title="Time Functions">
+    `time`, `date`, `clock`, `difftime`
+  </Card>
+  <Card title="File Operations">
+    `remove`, `rename`, `tmpname`
+  </Card>
+  <Card title="System Operations">
+    `execute`, `exit`, `getenv`, `setlocale`
+  </Card>
+</CardGroup>
+
+### os.time
+
+Returns the current time or converts a time table.
+
+<ParamField path="table" type="table">
+  Time table (omit for current time)
+</ParamField>
+
+<ResponseField name="time" type="integer">
+  Time value (seconds since epoch)
+</ResponseField>
+
+**Time table fields:**
+- `year` - Full year
+- `month` - Month (1-12)
+- `day` - Day (1-31)
+- `hour` - Hour (0-23, default: 12)
+- `min` - Minutes (0-59, default: 0)
+- `sec` - Seconds (0-59, default: 0)
+- `isdst` - Daylight saving flag (boolean)
+
+```lua
+local now = os.time()  -- Current time
+
+local t = os.time({
+  year = 2024,
+  month = 1,
+  day = 15,
+  hour = 10,
+  min = 30,
+  sec = 0
+})
+```
+
+### os.date
+
+Formats a date/time value.
+
+<ParamField path="format" type="string">
+  Format string (default: "%c")
+</ParamField>
+
+<ParamField path="time" type="integer">
+  Time value (default: current time)
+</ParamField>
+
+<ResponseField name="result" type="string | table">
+  Formatted string or time table if format is "*t"
+</ResponseField>
+
+**Format specifiers:**
+- `%a` - Abbreviated weekday name
+- `%A` - Full weekday name
+- `%b` - Abbreviated month name
+- `%B` - Full month name
+- `%c` - Date and time
+- `%d` - Day of month (01-31)
+- `%H` - Hour (00-23)
+- `%I` - Hour (01-12)
+- `%j` - Day of year (001-366)
+- `%m` - Month (01-12)
+- `%M` - Minute (00-59)
+- `%p` - AM or PM
+- `%S` - Second (00-59)
+- `%U` - Week number (Sunday first)
+- `%w` - Weekday (0-6, Sunday is 0)
+- `%W` - Week number (Monday first)
+- `%x` - Date
+- `%X` - Time
+- `%y` - Year (two digits)
+- `%Y` - Year (four digits)
+- `%z` - Time zone offset
+- `%Z` - Time zone name
+- `%%` - Percent sign
+
+```lua
+os.date()                    -- "Mon Jan 15 10:30:00 2024"
+os.date("%Y-%m-%d")         -- "2024-01-15"
+os.date("%H:%M:%S")         -- "10:30:00"
+os.date("%A, %B %d, %Y")    -- "Monday, January 15, 2024"
+
+-- Get time components
+local t = os.date("*t")
+print(t.year, t.month, t.day)  -- 2024 1 15
+
+-- UTC time
+local utc = os.date("!*t")  -- "!" prefix for UTC
+```
+
+### os.clock
+
+Returns CPU time used by the program.
+
+<ResponseField name="seconds" type="number">
+  CPU time in seconds
+</ResponseField>
+
+```lua
+local start = os.clock()
+-- Do some work
+for i = 1, 1000000 do end
+local elapsed = os.clock() - start
+print("Time:", elapsed)
+```
+
+### os.difftime
+
+Returns the difference between two time values.
+
+<ParamField path="t2" type="integer" required>
+  Later time
+</ParamField>
+
+<ParamField path="t1" type="integer" required>
+  Earlier time
+</ParamField>
+
+<ResponseField name="seconds" type="number">
+  Difference in seconds
+</ResponseField>
+
+```lua
+local start = os.time()
+-- Do something
+local finish = os.time()
+local elapsed = os.difftime(finish, start)
+print("Elapsed:", elapsed, "seconds")
+```
+
+## File System Operations
+
+### os.remove
+
+Deletes a file or directory.
+
+<ParamField path="filename" type="string" required>
+  Path to file or directory
+</ParamField>
+
+<ResponseField name="success" type="boolean">
+  True if successful
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if failed
+</ResponseField>
+
+```lua
+local ok, err = os.remove("temp.txt")
+if not ok then
+  print("Error:", err)
+end
+```
+
+### os.rename
+
+Renames a file or directory.
+
+<ParamField path="oldname" type="string" required>
+  Current name
+</ParamField>
+
+<ParamField path="newname" type="string" required>
+  New name
+</ParamField>
+
+<ResponseField name="success" type="boolean">
+  True if successful
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message if failed
+</ResponseField>
+
+```lua
+local ok, err = os.rename("old.txt", "new.txt")
+if not ok then
+  print("Error:", err)
+end
+```
+
+### os.tmpname
+
+Generates a temporary file name.
+
+<ResponseField name="filename" type="string">
+  Temporary file name
+</ResponseField>
+
+```lua
+local tmpname = os.tmpname()
+local file = io.open(tmpname, "w")
+file:write("temp data")
+file:close()
+os.remove(tmpname)
+```
+
+## System Operations
+
+### os.execute
+
+Executes a system command.
+
+<ParamField path="command" type="string">
+  Command to execute (nil to test shell availability)
+</ParamField>
+
+<ResponseField name="success" type="boolean">
+  True if command succeeded
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  "exit" or "signal"
+</ResponseField>
+
+<ResponseField name="code" type="integer">
+  Exit code or signal number
+</ResponseField>
+
+```lua
+-- Test if shell is available
+if os.execute() then
+  print("Shell available")
+end
+
+-- Execute command
+local ok, type, code = os.execute("ls -l")
+print(ok, type, code)
+
+-- Windows example
+os.execute("dir")
+
+-- Check command success
+if os.execute("mkdir temp") then
+  print("Directory created")
+end
+```
+
+### os.exit
+
+Terminates the program.
+
+<ParamField path="code" type="integer | boolean">
+  Exit code or boolean (default: true)
+</ParamField>
+
+<ParamField path="close" type="boolean">
+  If true, close Lua state before exit
+</ParamField>
+
+```lua
+os.exit()        -- Exit with success
+os.exit(0)       -- Exit with code 0
+os.exit(1)       -- Exit with code 1
+os.exit(false)   -- Exit with failure code
+```
+
+### os.getenv
+
+Gets an environment variable.
+
+<ParamField path="varname" type="string" required>
+  Variable name
+</ParamField>
+
+<ResponseField name="value" type="string | nil">
+  Variable value or nil if not set
+</ResponseField>
+
+```lua
+local path = os.getenv("PATH")
+local home = os.getenv("HOME")
+local user = os.getenv("USER")
+
+if os.getenv("DEBUG") then
+  print("Debug mode enabled")
+end
+```
+
+### os.setlocale
+
+Sets the program locale.
+
+<ParamField path="locale" type="string">
+  Locale name (nil for current locale)
+</ParamField>
+
+<ParamField path="category" type="string">
+  Category: "all", "collate", "ctype", "monetary", "numeric", "time"
+</ParamField>
+
+<ResponseField name="locale" type="string | nil">
+  Current locale or nil if failed
+</ResponseField>
+
+```lua
+-- Get current locale
+local current = os.setlocale()
+
+-- Set locale
+os.setlocale("en_US.UTF-8")
+os.setlocale("C")  -- Standard C locale
+
+-- Set specific category
+os.setlocale("en_US", "time")
+```
+
+## Usage Examples
+
+### Timing Operations
+
+```lua
+local function benchmark(func)
+  local start = os.clock()
+  func()
+  local elapsed = os.clock() - start
+  return elapsed
+end
+
+local time = benchmark(function()
+  for i = 1, 1000000 do
+    -- Work
+  end
+end)
+print("Time:", time, "seconds")
+```
+
+### Date Formatting
+
+```lua
+-- Format current date
+print(os.date("%Y-%m-%d %H:%M:%S"))
+
+-- Log with timestamp
+local function log(message)
+  local timestamp = os.date("%Y-%m-%d %H:%M:%S")
+  print(string.format("[%s] %s", timestamp, message))
+end
+
+log("Application started")
+```
+
+### Working with Time Tables
+
+```lua
+-- Get specific date
+local t = os.time({
+  year = 2024,
+  month = 12,
+  day = 25,
+  hour = 0,
+  min = 0,
+  sec = 0
+})
+
+-- Calculate days until
+local now = os.time()
+local diff = os.difftime(t, now)
+local days = math.floor(diff / (24 * 60 * 60))
+print("Days until:", days)
+```
+
+### Safe File Operations
+
+```lua
+local function safeRemove(filename)
+  local ok, err = os.remove(filename)
+  if not ok then
+    print("Failed to remove", filename, ":", err)
+    return false
+  end
+  return true
+end
+
+local function safeRename(old, new)
+  local ok, err = os.rename(old, new)
+  if not ok then
+    print("Failed to rename:", err)
+    return false
+  end
+  return true
+end
+```
+
+### Temporary Files
+
+```lua
+local function withTempFile(func)
+  local tmpname = os.tmpname()
+  local file = io.open(tmpname, "w+")
+  if not file then
+    return nil, "Failed to create temp file"
+  end
+  
+  local ok, result = pcall(func, file)
+  file:close()
+  os.remove(tmpname)
+  
+  if ok then
+    return result
+  else
+    return nil, result
+  end
+end
+
+withTempFile(function(file)
+  file:write("temporary data")
+  file:seek("set", 0)
+  print(file:read("a"))
+end)
+```
